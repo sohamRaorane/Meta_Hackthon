@@ -32,7 +32,7 @@ class MumbaiLastMileEnvironment(Environment):
 
     # This tells openenv that multiple sessions can run at the same time.
     # Important for the hackathon validator which runs parallel tests.
-    SUPPORTS_CONCURRENT_SESSIONS = True
+    SUPPORTS_CONCURRENT_SESSIONS = False
 
     def __init__(self):
         # All the variables that track the current state of one episode
@@ -98,9 +98,10 @@ class MumbaiLastMileEnvironment(Environment):
 
         # Return the first Observation (no reward yet — episode just started)
         return MumbaiObservation(
-            done=False,              # Episode is not over
-            reward=None,             # No reward on the first observation
-            echoed_message=echoed,   # The situation text
+            done=False,
+            reward=None,
+            episode_id=self._state.episode_id,
+            echoed_message=echoed,
             current_location=self._location,
             destination=cfg["destination"],
             time_remaining_minutes=self._time_remaining,
@@ -130,6 +131,8 @@ class MumbaiLastMileEnvironment(Environment):
           5. Checks if the episode is over (reached destination, out of time, or max steps)
           6. Returns the new Observation
         """
+    
+
         # Increment counters
         self._timestep += 1
         self._state.step_count += 1
@@ -178,10 +181,11 @@ class MumbaiLastMileEnvironment(Environment):
         return MumbaiObservation(
             done=done,
             reward=reward,
+            episode_id=self._state.episode_id,
             echoed_message=echoed,
             current_location=self._location,
             destination=cfg["destination"],
-            time_remaining_minutes=max(0, self._time_remaining),  # Never go below 0
+            time_remaining_minutes=max(0, self._time_remaining),
             budget_remaining=self._budget,
             weather=self._weather,
             available_modes=modes,
