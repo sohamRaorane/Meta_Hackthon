@@ -31,4 +31,6 @@ EXPOSE 8000
 
 # Command to start the server when the container runs
 # Uses 0.0.0.0 so it's accessible from outside the container (not just localhost)
-CMD ["python", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8000"]
+ENV PORT=7860
+EXPOSE 7860
+CMD ["python", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860"]

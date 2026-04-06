@@ -1,46 +1,46 @@
-# openenv.yaml
-# ──────────────────────────────────────────────────────────────
-# Metadata file for the OpenEnv hackathon validator.
-# This tells the validator everything it needs to know about
-# your environment.
-# ──────────────────────────────────────────────────────────────
-
 name: mumbai-lastmile-crisis-response
 version: "1.0"
 description: >
   Mumbai Last-Mile Crisis Response Environment.
-  An AI agent must choose optimal transport modes under 
+  An AI agent must navigate multi-leg Mumbai commutes under
   partial information, weather disruptions, and budget/time constraints.
 
-author: Soham Raorane, Om Patil and Soumil Sethna
+author: Soham Raorane, Om Patil, Soumil Sethna
 
-# Where the server runs
+benchmark: mumbai-lastmile
+
 server:
   host: "0.0.0.0"
-  port: 8000
-  start_command: "python -m uvicorn server.app:app --host 0.0.0.0 --port 8000"
+  port: 7860
+  start_command: "python -m uvicorn server.app:app --host 0.0.0.0 --port 7860"
 
-# The 3 tasks the validator will test
 tasks:
   - name: easy
-    description: "Andheri East to Kurla, clear weather, 45 min, ₹100 budget"
+    description: "2-leg journey Andheri→Kurla, clear weather, 60min, ₹120 budget"
     seed: 42
-    max_steps: 3
-
-  - name: medium
-    description: "Andheri East to Kurla, heavy rain, 40 min, ₹80 budget, uncertain sensors"
-    seed: 7
-    max_steps: 3
-
-  - name: hard
-    description: "Borivali to CST, heavy rain + signal failure, 75 min, ₹80 budget, mid-journey event"
-    seed: 13
     max_steps: 4
 
-# What action type the environment expects
+  - name: medium
+    description: "3-leg journey Borivali→CST, heavy rain, 90min, ₹80 budget, mid-journey event"
+    seed: 7
+    max_steps: 5
+
+  - name: hard
+    description: "4-leg journey Churchgate→BKC, cascading failures, 85min, ₹75 budget"
+    seed: 13
+    max_steps: 6
+
+  - name: bonus
+    description: "2-leg journey Bandra→Juhu, light rain, 40min, ₹30 budget crisis"
+    seed: 99
+    max_steps: 4
+
 action_type: text_message
 
-# Reward range
 reward:
   min: -1.0
   max: 1.5
+
+score:
+  min: 0.0
+  max: 1.0
