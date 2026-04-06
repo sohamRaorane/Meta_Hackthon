@@ -1,3 +1,18 @@
+---
+title: Mumbai Last-Mile Crisis Response
+emoji: 🚇
+colorFrom: blue
+colorTo: red
+sdk: docker
+pinned: false
+tags:
+  - openenv
+  - environment
+  - reinforcement-learning
+  - mumbai
+  - transport
+---
+
 # Mumbai Last-Mile Crisis Response Environment
 
 An OpenEnv environment where an AI agent must navigate multi-leg Mumbai 
