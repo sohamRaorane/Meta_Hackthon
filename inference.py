@@ -37,24 +37,27 @@ TASK_SEEDS = {"easy": 42, "medium": 7, "hard": 13, "bonus": 99}
 # ── Mandatory logging functions ──────────────────────────────────
 
 def log_start(task: str, env: str, model: str) -> None:
-    print(json.dumps({
-        "type": "START", "task": task,
-        "env": env, "model": model
-    }), flush=True)
+    print(f"[START] task={task} env={env} model={model}", flush=True)
 
 def log_step(step: int, action: str, reward: float,
              done: bool, error) -> None:
-    print(json.dumps({
-        "type": "STEP", "step": step, "action": action,
-        "reward": reward, "done": done, "error": error
-    }), flush=True)
+    action_clean = str(action).replace("\n", " ").replace("\r", "")[:80]
+    error_val    = error if error else "null"
+    done_val     = str(done).lower()
+    print(
+        f"[STEP] step={step} action={action_clean} "
+        f"reward={reward:.2f} done={done_val} error={error_val}",
+        flush=True,
+    )
 
 def log_end(success: bool, steps: int,
             score: float, rewards: list) -> None:
-    print(json.dumps({
-        "type": "END", "success": success, "steps": steps,
-        "score": score, "rewards": rewards
-    }), flush=True)
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} "
+        f"score={score:.3f} rewards={rewards_str}",
+        flush=True,
+    )
 
 # ── System Prompt ────────────────────────────────────────────────
 

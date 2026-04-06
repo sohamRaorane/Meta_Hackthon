@@ -72,8 +72,8 @@ Programmatic deterministic graders are implemented in `server/graders.py` for al
 # Install dependencies
 pip install -r requirements.txt
 
-# Start the Streamlit UI (this also starts FastAPI on port 7861 internally)
-streamlit run app.py --server.port 7860 --server.address 0.0.0.0
+# Start the FastAPI server (same runtime as Docker)
+uvicorn server.app:app --host 0.0.0.0 --port 7860
 
 # Run inference (in another terminal)
 export SERVER_URL=http://localhost:7860
@@ -85,7 +85,10 @@ export OPENAI_API_KEY=your-api-key-here
 python inference.py
 ```
 
-Note: For local Streamlit-based testing, keep `SERVER_URL=http://localhost:7861`.
+Optional local UI (separate terminal):
+```bash
+streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+```
 
 ## Docker
 ```bash

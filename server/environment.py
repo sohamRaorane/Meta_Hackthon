@@ -20,7 +20,7 @@ class MumbaiLastMileEnvironment(Environment):
     Supports multi-leg journeys with waypoints.
     """
 
-    SUPPORTS_CONCURRENT_SESSIONS = True
+    SUPPORTS_CONCURRENT_SESSIONS = False
 
     def __init__(self):
         self._task_cfg       = None
