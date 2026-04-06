@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 import uuid
+import uvicorn
 
 from server.environment import MumbaiLastMileEnvironment
 from models import MumbaiAction
@@ -118,4 +119,48 @@ def state(episode_id: str):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "active_sessions": len(ENV_STORE)}
+    return {"status": "healthy", "active_sessions": len(ENV_STORE)}
+
+
+@app.get("/metadata")
+def metadata():
+    return {
+        "name": "mumbai-lastmile-crisis-response",
+        "description": "Mumbai last-mile multi-leg crisis response simulation",
+    }
+
+
+@app.get("/schema")
+def schema():
+    return {
+        "action": MumbaiAction.model_json_schema(),
+        "observation": {
+            "type": "object",
+            "description": "See /reset and /step observation payload fields",
+        },
+        "state": {
+            "type": "object",
+            "description": "See /state response payload fields",
+        },
+    }
+
+
+@app.post("/mcp")
+def mcp_stub(payload: dict):
+    request_id = payload.get("id") if isinstance(payload, dict) else None
+    return {
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "error": {
+            "code": -32601,
+            "message": "MCP not implemented for this environment",
+        },
+    }
+
+
+def main() -> None:
+    uvicorn.run(app, host="0.0.0.0", port=7860)
+
+
+if __name__ == "__main__":
+    main()

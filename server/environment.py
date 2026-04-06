@@ -20,7 +20,7 @@ class MumbaiLastMileEnvironment(Environment):
     Supports multi-leg journeys with waypoints.
     """
 
-    SUPPORTS_CONCURRENT_SESSIONS = False
+    SUPPORTS_CONCURRENT_SESSIONS = True
 
     def __init__(self):
         self._task_cfg       = None
@@ -283,7 +283,7 @@ class MumbaiLastMileEnvironment(Environment):
             reward -= 0.3
 
         # Normalize the reward signal so downstream graders always receive [0, 1].
-        return round(max(0.0, min(1.0, reward)), 4)
+        return round(max(-1.0, min(1.5, reward)), 4)
 
     def _get_modes(self) -> List[ModeInfo]:
         """

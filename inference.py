@@ -10,13 +10,14 @@ import json
 import requests
 from typing import List, Optional
 from openai import OpenAI
+from server.graders import grade_task
 
 # ── Credentials from environment variables (MANDATORY) ──────────
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.featherless.ai/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
-API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "rc_cba4823093bb28e6f9d32b4dc41b54976405c30722feadf9baa065fe255d450d")
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", "")
 
-SERVER_URL   = os.getenv("SERVER_URL", "http://localhost:7861")
+SERVER_URL   = os.getenv("SERVER_URL", "http://localhost:7860")
 BENCHMARK    = "mumbai-lastmile"
 
 # Max possible reward per task (used to normalize score to [0,1])
@@ -36,28 +37,24 @@ TASK_SEEDS = {"easy": 42, "medium": 7, "hard": 13, "bonus": 99}
 # ── Mandatory logging functions ──────────────────────────────────
 
 def log_start(task: str, env: str, model: str) -> None:
-    print(f"[START] task={task} env={env} model={model}", flush=True)
+    print(json.dumps({
+        "type": "START", "task": task,
+        "env": env, "model": model
+    }), flush=True)
 
+def log_step(step: int, action: str, reward: float,
+             done: bool, error) -> None:
+    print(json.dumps({
+        "type": "STEP", "step": step, "action": action,
+        "reward": reward, "done": done, "error": error
+    }), flush=True)
 
-def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
-    # Sanitize action string — remove newlines, truncate
-    action_clean = action.replace("\n", " ").replace("\r", "")[:80]
-    error_val    = error if error else "null"
-    done_val     = str(done).lower()
-    print(
-        f"[STEP] step={step} action={action_clean} "
-        f"reward={reward:.2f} done={done_val} error={error_val}",
-        flush=True,
-    )
-
-
-def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(
-        f"[END] success={str(success).lower()} steps={steps} "
-        f"score={score:.3f} rewards={rewards_str}",
-        flush=True,
-    )
+def log_end(success: bool, steps: int,
+            score: float, rewards: list) -> None:
+    print(json.dumps({
+        "type": "END", "success": success, "steps": steps,
+        "score": score, "rewards": rewards
+    }), flush=True)
 
 # ── System Prompt ────────────────────────────────────────────────
 
@@ -188,6 +185,7 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
     steps_taken   = 0
     success       = False
     pending_event = None
+    final_obs     = {}
 
     try:
         reset_data = call_reset(task_name, seed)
@@ -206,6 +204,7 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
 
             step_data = call_step(episode_id, action_msg)
             obs       = step_data["observation"]
+            final_obs = obs
             reward    = float(step_data.get("reward") or 0.0)
             done      = bool(step_data.get("done", False))
             error     = None
@@ -235,6 +234,7 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
     total_reward = sum(rewards)
     max_reward   = MAX_REWARD_PER_TASK.get(task_name, 2.0)
     score        = round(min(max(total_reward / max_reward, 0.0), 1.0), 3)
+    grader_score = grade_task(task_name, final_obs, rewards, steps_taken)
 
     log_end(
         success=success,
@@ -249,6 +249,7 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
         "steps":     steps_taken,
         "success":   success,
         "rewards":   rewards,
+        "grader_score": grader_score,
     }
 
 # ── Main ─────────────────────────────────────────────────────────
@@ -256,23 +257,8 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
 def main():
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
-    results = []
     for task_name in TASKS:
-        result = run_task(task_name, TASK_SEEDS[task_name], client)
-        results.append(result)
-
-    # Human-readable summary (goes to stdout after all tasks)
-    print("\n========== FINAL SUMMARY ==========", flush=True)
-    for r in results:
-        status = "SUCCESS" if r["success"] else "FAIL"
-        print(
-            f"{r['task_name']:<10} score={r['score']:.3f}  "
-            f"steps={r['steps']}  {status}",
-            flush=True,
-        )
-    total = sum(r["score"] for r in results) / len(results)
-    print(f"\nAVERAGE SCORE: {total:.3f}", flush=True)
-    print("====================================", flush=True)
+        run_task(task_name, TASK_SEEDS[task_name], client)
 
 
 if __name__ == "__main__":

@@ -42,6 +42,9 @@ Text message describing the chosen transport mode:
 | hard | Churchgate → BKC | 4 | 85min | ₹75 | heavy_rain | Cascading failures |
 | bonus | Bandra → Juhu | 2 | 40min | ₹30 | light_rain | Budget crisis |
 
+Programmatic deterministic graders are implemented in `server/graders.py` for all tasks
+(`easy`, `medium`, `hard`, `bonus`) and return scores in `[0.0, 1.0]`.
+
 ## Reward Function
 
 - `+0.15` per successful mode (mode was available)
@@ -73,12 +76,16 @@ pip install -r requirements.txt
 streamlit run app.py --server.port 7860 --server.address 0.0.0.0
 
 # Run inference (in another terminal)
-export SERVER_URL=http://localhost:7861
+export SERVER_URL=http://localhost:7860
 export API_BASE_URL=https://api.featherless.ai/v1
 export MODEL_NAME=Qwen/Qwen2.5-7B-Instruct
 export HF_TOKEN=your-api-key-here
+# Optional alternative key variable understood by inference.py
+export OPENAI_API_KEY=your-api-key-here
 python inference.py
 ```
+
+Note: For local Streamlit-based testing, keep `SERVER_URL=http://localhost:7861`.
 
 ## Docker
 ```bash
@@ -89,6 +96,8 @@ docker run -p 7860:7860 \
   -e HF_TOKEN=your-key \
   mumbai-lastmile
 ```
+
+Container entrypoint serves FastAPI directly on port `7860` via `uvicorn server.app:app`.
 
 ## Project Structure
 ```

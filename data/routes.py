@@ -255,7 +255,7 @@ TASKS = {
             {
                 "from_location": "Dadar",
                 "to_location":   "CST",
-                "corridor_key":  "CST_to_Kurla",
+                "corridor_key": "Churchgate_to_Dadar",                                                                  
                 "description":   "Second leg: Dadar area to CST junction",
             },
             {
