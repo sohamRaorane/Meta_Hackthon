@@ -16,7 +16,7 @@ API_BASE_URL = os.getenv("API_BASE_URL", "https://api.featherless.ai/v1")
 MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
 API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "rc_cba4823093bb28e6f9d32b4dc41b54976405c30722feadf9baa065fe255d450d")
 
-SERVER_URL   = os.getenv("SERVER_URL", "http://localhost:8000")
+SERVER_URL   = os.getenv("SERVER_URL", "http://localhost:7861")
 BENCHMARK    = "mumbai-lastmile"
 
 # Max possible reward per task (used to normalize score to [0,1])

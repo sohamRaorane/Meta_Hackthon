@@ -282,7 +282,8 @@ class MumbaiLastMileEnvironment(Environment):
         if self._budget < -10:
             reward -= 0.3
 
-        return round(max(-1.0, min(1.5, reward)), 4)
+        # Normalize the reward signal so downstream graders always receive [0, 1].
+        return round(max(0.0, min(1.0, reward)), 4)
 
     def _get_modes(self) -> List[ModeInfo]:
         """

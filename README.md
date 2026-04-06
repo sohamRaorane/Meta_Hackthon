@@ -69,10 +69,11 @@ Text message describing the chosen transport mode:
 # Install dependencies
 pip install -r requirements.txt
 
-# Start the server
-python -m uvicorn server.app:app --host 0.0.0.0 --port 7860
+# Start the Streamlit UI (this also starts FastAPI on port 7861 internally)
+streamlit run app.py --server.port 7860 --server.address 0.0.0.0
 
 # Run inference (in another terminal)
+export SERVER_URL=http://localhost:7861
 export API_BASE_URL=https://api.featherless.ai/v1
 export MODEL_NAME=Qwen/Qwen2.5-7B-Instruct
 export HF_TOKEN=your-api-key-here
@@ -96,10 +97,11 @@ docker run -p 7860:7860 \
 ├── server/
 │   ├── app.py             # FastAPI server
 │   └── environment.py     # Core simulation engine
+├── app.py                 # Streamlit frontend UI
 ├── models.py              # Pydantic typed models
 ├── client.py              # Client wrapper
 ├── inference.py           # Baseline agent script
-├── Dockerfile             
+├── server/Dockerfile      
 ├── openenv.yaml           
 └── README.md              
 ```

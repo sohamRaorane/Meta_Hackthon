@@ -1,5 +1,7 @@
-openenv-core==0.2.3
-pydantic>=2.0
-openai
-uvicorn[standard]
 fastapi
+uvicorn[standard]
+pydantic
+openenv-core
+requests
+streamlit
+openai
