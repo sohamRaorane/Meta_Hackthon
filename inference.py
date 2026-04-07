@@ -13,9 +13,12 @@ from openai import OpenAI
 from server.graders import grade_task
 
 # ── Credentials from environment variables (MANDATORY) ──────────
+# API_BASE_URL = os.getenv("API_BASE_URL", "https://api.featherless.ai/v1")
+# MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.featherless.ai/v1")
-MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", "")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
+HF_TOKEN = os.getenv("HF_TOKEN")
+API_KEY = HF_TOKEN or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", "")
 
 SERVER_URL   = os.getenv("SERVER_URL", "http://localhost:7860")
 BENCHMARK    = "mumbai-lastmile"

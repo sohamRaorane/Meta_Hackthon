@@ -32,6 +32,8 @@ class ResetRequest(BaseModel):
     seed: Optional[int] = None
     episode_id: Optional[str] = None
 
+    model_config = {"extra": "ignore"}
+
 class StepRequest(BaseModel):
     episode_id: str
     action: MumbaiAction
@@ -70,7 +72,9 @@ def obs_to_dict(obs, reward=None, done=False):
 # ── Endpoints ───────────────────────────────────────────────────
 
 @app.post("/reset")
-def reset(req: ResetRequest):
+def reset(req: ResetRequest = None):
+    if req is None:
+        req = ResetRequest()
     # Create a brand new environment instance for this episode
     env = MumbaiLastMileEnvironment()
     episode_id = req.episode_id or str(uuid.uuid4())
