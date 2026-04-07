@@ -7,6 +7,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
 import uuid
@@ -16,6 +17,9 @@ from server.environment import MumbaiLastMileEnvironment
 from models import MumbaiAction
 
 app = FastAPI()
+@app.get("/")
+def root():
+    return RedirectResponse(url="/docs")
 
 # Global store: episode_id → environment instance
 # This is the correct way to manage state across requests
