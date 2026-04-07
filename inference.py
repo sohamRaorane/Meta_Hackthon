@@ -239,7 +239,8 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
     # Normalize total reward to [0, 1]
     total_reward = sum(rewards)
     max_reward   = MAX_REWARD_PER_TASK.get(task_name, 2.0)
-    score        = round(min(max(total_reward / max_reward, 0.0), 1.0), 3)
+    raw_score = total_reward / max_reward
+    score = round(min(max(raw_score, 0.001), 0.999), 3)
     grader_score = grade_task(task_name, final_obs, rewards, steps_taken)
 
     log_end(

@@ -4,7 +4,13 @@ from typing import Any
 
 
 def _clamp01(value: float) -> float:
-    return max(0.0, min(1.0, round(value, 4)))
+    """Clamp to strictly open interval (0, 1) — 0.0 and 1.0 are not valid."""
+    clamped = max(0.0, min(1.0, round(value, 4)))
+    if clamped <= 0.0:
+        return 0.001
+    if clamped >= 1.0:
+        return 0.999
+    return clamped
 
 
 def _base_grade(final_observation: dict[str, Any], rewards: list[float], steps_taken: int) -> float:
