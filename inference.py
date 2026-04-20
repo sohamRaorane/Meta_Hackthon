@@ -27,12 +27,7 @@ BENCHMARK    = "mumbai-lastmile"
 # Based on reward function: per-leg rewards + destination + buffer + efficiency
 # Easy: 2 legs, max ~1.5 per step realistically
 # We use a fixed normalization ceiling
-MAX_REWARD_PER_TASK = {
-    "easy":   2.0,
-    "medium": 2.0,
-    "hard":   2.5,
-    "bonus":  2.0,
-}
+
 
 TASKS = ["easy", "medium", "hard", "bonus"]
 TASK_SEEDS = {"easy": 42, "medium": 7, "hard": 13, "bonus": 99}
@@ -246,17 +241,16 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
     log_end(
         success=success,
         steps=steps_taken,
-        score=score,
+        score=grader_score,        # ← grader_score, not raw_score
         rewards=rewards,
     )
 
     return {
-        "task_name": task_name,
-        "score":     score,
-        "steps":     steps_taken,
-        "success":   success,
-        "rewards":   rewards,
-        "grader_score": grader_score,
+        "task_name":  task_name,
+        "score":      grader_score,
+        "steps":      steps_taken,
+        "success":    success,
+        "rewards":    rewards,
     }
 
 # ── Main ─────────────────────────────────────────────────────────

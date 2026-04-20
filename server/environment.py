@@ -88,6 +88,7 @@ class MumbaiLastMileEnvironment(Environment):
             known_disruptions=self._disruptions,
             mid_journey_update=None,
             timestep=self._timestep,
+            reached=False, 
         )
 
     def step(
@@ -156,6 +157,7 @@ class MumbaiLastMileEnvironment(Environment):
             known_disruptions=self._disruptions,
             mid_journey_update=mid_update,
             timestep=self._timestep,
+            reached=self._reached,
         )
 
     @property
@@ -171,14 +173,39 @@ class MumbaiLastMileEnvironment(Environment):
         # All legs done — return last leg as reference
         return self._legs[-1]
 
-    def _parse_mode(self, message: str) -> str:
-        msg = message.lower()
-        for mode in ["metro", "train", "auto", "rickshaw", "bus", "walk"]:
-            if mode in msg:
-                return "auto" if mode == "rickshaw" else mode
-        return "bus"
+def _parse_mode(self, message: str) -> str:
+    """
+    Extract transport mode from agent message.
 
-    def _simulate_leg(self, mode: str) -> dict:
+    Phase 0 fix (issue #2):
+      Old implementation used naive substring search.
+      "automatic" would match "auto". "metropolitan" would match "metro".
+      Fix: try JSON parse first, extract "mode" key with word-boundary
+      validation. Only fall back to substring scan if JSON fails.
+    """
+    # ── Attempt 1: JSON parse (preferred — LLM outputs JSON) ────────────
+    import json as _json
+    try:
+        parsed = _json.loads(message)
+        if isinstance(parsed, dict):
+            mode_key = str(parsed.get("mode", "")).strip().lower()
+            if mode_key in {"metro", "train", "auto", "bus", "walk"}:
+                return mode_key
+    except (_json.JSONDecodeError, ValueError):
+        pass
+
+    # ── Attempt 2: word-boundary regex scan ─────────────────────────────
+    import re as _re
+    msg = message.lower()
+    for mode in ["metro", "train", "auto", "bus", "walk"]:
+        # \b ensures "auto" does not fire inside "automatic"
+        if _re.search(rf"\b{mode}\b", msg):
+            return mode
+
+    # ── Fallback ─────────────────────────────────────────────────────────
+    return "bus"
+
+def _simulate_leg(self, mode: str) -> dict:
         """
         Simulate one leg for the chosen mode.
         Uses the corridor of the CURRENT leg.
@@ -221,7 +248,7 @@ class MumbaiLastMileEnvironment(Environment):
             "time_taken":       time_taken,
             "moved":            True,
             "success":          True,
-            "mode_unavailable": False,
+            "mode_unavailable": False,          
             "message": (
                 f"Took {mode} from {leg['from_location']} to "
                 f"{leg['to_location']} — {time_taken} min, "
@@ -229,7 +256,7 @@ class MumbaiLastMileEnvironment(Environment):
             ),
         }
 
-    def _calc_reward(self, outcome: dict, mode: str) -> float:
+def _calc_reward(self, outcome: dict, mode: str) -> float:
         """
         Reward function — now accounts for partial progress (per leg).
 
@@ -285,7 +312,7 @@ class MumbaiLastMileEnvironment(Environment):
         # Normalize the reward signal so downstream graders always receive [0, 1].
         return round(max(-1.0, min(1.5, reward)), 4)
 
-    def _get_modes(self) -> List[ModeInfo]:
+def _get_modes(self) -> List[ModeInfo]:
         """
         Build ModeInfo list for the CURRENT leg's corridor.
         """
@@ -314,7 +341,7 @@ class MumbaiLastMileEnvironment(Environment):
             )
         return modes
 
-    def _build_echoed(
+def _build_echoed(
         self,
         modes: List[ModeInfo],
         last_msg: str = "",

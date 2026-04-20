@@ -61,6 +61,17 @@ CORRIDORS = {
         "metro": {"cost": 40,  "time_min": 22, "time_max": 28, "availability": 0.90},
         "walk":  {"cost": 0,   "time_min": 90, "time_max": 110,"availability": 1.00},
     },
+
+    "Dadar_to_CST": {
+        # Central line southbound — Dadar to CST is ~4 stops, 12-18 min
+        # This is a real commuter route used by thousands daily
+        "train": {"cost": 10,  "time_min": 12, "time_max": 18, "availability": 0.82},
+        "bus":   {"cost": 10,  "time_min": 20, "time_max": 35, "availability": 0.78},
+        "auto":  {"cost": 80,  "time_min": 15, "time_max": 28, "availability": 0.68},
+        "metro": {"cost": 25,  "time_min": 14, "time_max": 20, "availability": 0.88},
+        "walk":  {"cost": 0,   "time_min": 45, "time_max": 55, "availability": 1.00},
+    },
+
     "Dadar_to_Bandra": {
         "train": {"cost": 10,  "time_min": 12, "time_max": 18, "availability": 0.85},
         "bus":   {"cost": 10,  "time_min": 20, "time_max": 35, "availability": 0.82},
@@ -255,7 +266,7 @@ TASKS = {
             {
                 "from_location": "Dadar",
                 "to_location":   "CST",
-                "corridor_key":  "CST_to_Kurla",
+                "corridor_key":  "Dadar_to_CST",
                 "description":   "Second leg: Dadar to CST via Central line (southbound)",
             },
             {

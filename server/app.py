@@ -64,6 +64,7 @@ def obs_to_dict(obs, reward=None, done=False):
             "known_disruptions":  obs.known_disruptions,
             "mid_journey_update": obs.mid_journey_update,
             "timestep":           obs.timestep,
+            "reached":            getattr(obs, "reached", False),
         },
         "reward": reward,
         "done":   done,
@@ -84,6 +85,14 @@ def reset(req: ResetRequest = None):
         seed=req.seed,
         episode_id=episode_id,
     )
+
+    # Phase 0 fix (issue #3): ENV_STORE eviction cap.
+    # Without this, abandoned sessions accumulate and cause OOM on HF free tier.
+    # Cap at 50 concurrent sessions. When full, evict the oldest entry.
+    MAX_SESSIONS = 50
+    if len(ENV_STORE) >= MAX_SESSIONS:
+        oldest_key = next(iter(ENV_STORE))
+        ENV_STORE.pop(oldest_key, None)
 
     # Store the env so /step can find it later
     ENV_STORE[episode_id] = env
