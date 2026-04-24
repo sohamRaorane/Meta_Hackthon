@@ -28,7 +28,7 @@ tasks:
   - name: hard
     description: "4-leg journey Churchgate→BKC, cascading failures, 85min, ₹75 budget"
     seed: 13
-    max_steps: 6
+    max_steps: 7
 
   - name: bonus
     description: "2-leg journey Bandra→Juhu, light rain, 40min, ₹30 budget crisis"

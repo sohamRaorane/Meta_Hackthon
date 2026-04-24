@@ -167,6 +167,7 @@ WEATHER_MODIFIERS = {
         "bus_time_factor":    1.3,
         "train_availability": 0.85,
         "metro_availability": 0.95,
+        "walk_availability":  0.55,
     },
 }
 

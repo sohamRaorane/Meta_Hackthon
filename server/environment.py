@@ -20,7 +20,7 @@ class MumbaiLastMileEnvironment(Environment):
     Supports multi-leg journeys with waypoints.
     """
 
-    SUPPORTS_CONCURRENT_SESSIONS = False
+    SUPPORTS_CONCURRENT_SESSIONS = True
 
     def __init__(self):
         self._task_cfg       = None
@@ -188,39 +188,39 @@ class MumbaiLastMileEnvironment(Environment):
         # All legs done — return last leg as reference
         return self._legs[-1]
 
-def _parse_mode(self, message: str) -> str:
-    """
-    Extract transport mode from agent message.
+    def _parse_mode(self, message: str) -> str:
+        """
+        Extract transport mode from agent message.
 
-    Phase 0 fix (issue #2):
-      Old implementation used naive substring search.
-      "automatic" would match "auto". "metropolitan" would match "metro".
-      Fix: try JSON parse first, extract "mode" key with word-boundary
-      validation. Only fall back to substring scan if JSON fails.
-    """
-    # ── Attempt 1: JSON parse (preferred — LLM outputs JSON) ────────────
-    import json as _json
-    try:
-        parsed = _json.loads(message)
-        if isinstance(parsed, dict):
-            mode_key = str(parsed.get("mode", "")).strip().lower()
-            if mode_key in {"metro", "train", "auto", "bus", "walk"}:
-                return mode_key
-    except (_json.JSONDecodeError, ValueError):
-        pass
+        Phase 0 fix (issue #2):
+          Old implementation used naive substring search.
+          "automatic" would match "auto". "metropolitan" would match "metro".
+          Fix: try JSON parse first, extract "mode" key with word-boundary
+          validation. Only fall back to substring scan if JSON fails.
+        """
+        # ── Attempt 1: JSON parse (preferred — LLM outputs JSON) ────────────
+        import json as _json
+        try:
+            parsed = _json.loads(message)
+            if isinstance(parsed, dict):
+                mode_key = str(parsed.get("mode", "")).strip().lower()
+                if mode_key in {"metro", "train", "auto", "bus", "walk"}:
+                    return mode_key
+        except (_json.JSONDecodeError, ValueError):
+            pass
 
-    # ── Attempt 2: word-boundary regex scan ─────────────────────────────
-    import re as _re
-    msg = message.lower()
-    for mode in ["metro", "train", "auto", "bus", "walk"]:
-        # \b ensures "auto" does not fire inside "automatic"
-        if _re.search(rf"\b{mode}\b", msg):
-            return mode
+        # ── Attempt 2: word-boundary regex scan ─────────────────────────────
+        import re as _re
+        msg = message.lower()
+        for mode in ["metro", "train", "auto", "bus", "walk"]:
+            # \b ensures "auto" does not fire inside "automatic"
+            if _re.search(rf"\b{mode}\b", msg):
+                return mode
 
-    # ── Fallback ─────────────────────────────────────────────────────────
-    return "bus"
+        # ── Fallback ─────────────────────────────────────────────────────────
+        return "bus"
 
-def _simulate_leg(self, mode: str) -> dict:
+    def _simulate_leg(self, mode: str) -> dict:
         """
         Simulate one leg for the chosen mode.
         Uses the corridor of the CURRENT leg.
@@ -271,7 +271,7 @@ def _simulate_leg(self, mode: str) -> dict:
             ),
         }
 
-def _reward_completion(self) -> float:
+    def _reward_completion(self) -> float:
         """
         Paper 2408.10215 Section 3.1 — Outcome reward.
         Binary success signal: did the agent complete all legs?
@@ -358,7 +358,7 @@ def _reward_completion(self) -> float:
 
         return round(max(-1.0, min(1.5, total)), 4)
 
-def _get_modes(self) -> List[ModeInfo]:
+    def _get_modes(self) -> List[ModeInfo]:
         """
         Build ModeInfo list for the CURRENT leg's corridor.
         """
@@ -387,7 +387,7 @@ def _get_modes(self) -> List[ModeInfo]:
             )
         return modes
 
-def _build_echoed(
+    def _build_echoed(
         self,
         modes: List[ModeInfo],
         last_msg: str = "",

@@ -133,37 +133,51 @@ def ask_model(client: OpenAI, situation: str, mid_event: str = None) -> dict:
     if mid_event:
         prompt = f"MID-JOURNEY EVENT — RE-PLAN:\n{mid_event}\n\n{situation}"
 
-    try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            max_tokens=150,
-            temperature=0.1,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": prompt},
-            ],
-        )
-        raw = response.choices[0].message.content.strip()
-    except Exception as e:
-        return {"mode": "bus", "reason": f"API error: {str(e)[:50]}"}
+    # Retry logic with exponential backoff: 1s, 2s, 4s
+    import time
+    max_attempts = 3
+    backoff_seconds = [1, 2, 4]
+    
+    for attempt in range(max_attempts):
+        try:
+            response = client.chat.completions.create(
+                model=MODEL_NAME,
+                max_tokens=150,
+                temperature=0.1,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user",   "content": prompt},
+                ],
+            )
+            raw = response.choices[0].message.content.strip()
+        except Exception as e:
+            if attempt < max_attempts - 1:
+                wait_time = backoff_seconds[attempt]
+                time.sleep(wait_time)
+                continue
+            else:
+                return {"mode": "bus", "reason": f"API error after {max_attempts} attempts: {str(e)[:40]}"}
 
-    # Strip markdown fences
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
+        # Strip markdown fences
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
 
-    try:
-        decision = json.loads(raw)
-        if decision.get("mode") not in ["metro","train","auto","bus","walk"]:
-            raise ValueError("invalid mode")
-        return decision
-    except (json.JSONDecodeError, ValueError):
-        for mode in ["metro","train","bus","auto","walk"]:
-            if mode in raw.lower():
-                return {"mode": mode, "reason": f"parsed from: {raw[:60]}"}
-        return {"mode": "bus", "reason": "fallback"}
+        try:
+            decision = json.loads(raw)
+            if decision.get("mode") not in ["metro","train","auto","bus","walk"]:
+                raise ValueError("invalid mode")
+            return decision
+        except (json.JSONDecodeError, ValueError):
+            for mode in ["metro","train","bus","auto","walk"]:
+                if mode in raw.lower():
+                    return {"mode": mode, "reason": f"parsed from: {raw[:60]}"}
+            return {"mode": "bus", "reason": "fallback"}
+    
+    # Should not reach here
+    return {"mode": "bus", "reason": "max_attempts exhausted"}
 
 # ── Task runner ──────────────────────────────────────────────────
 
@@ -216,8 +230,8 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
             if obs.get("mid_journey_update"):
                 pending_event = obs["mid_journey_update"]
 
-        # Check success: reached destination
-        success = obs["current_location"] == obs["destination"]
+        # Check success: reached final destination
+        success = bool(final_obs.get("reached", False))
 
     except Exception as e:
         error_msg = str(e)[:80]
@@ -225,9 +239,6 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
 
     # Normalize total reward to [0, 1]
     total_reward = sum(rewards)
-    max_reward   = MAX_REWARD_PER_TASK.get(task_name, 2.0)
-    raw_score = total_reward / max_reward
-    score = round(min(max(raw_score, 0.001), 0.999), 3)
     grader_score = grade_task(task_name, final_obs, rewards, steps_taken)
 
     log_end(
