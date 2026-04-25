@@ -1,0 +1,47 @@
+{
+  "phase": "baseline",
+  "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
+  "environment": "mumbai-lastmile",
+  "timestamp": "2025-04-26T00:00:00",
+  "tasks": [
+    {
+      "task_name": "easy",
+      "score": 0.831,
+      "steps": 2,
+      "success": true,
+      "rewards": [0.39, 1.27],
+      "total_reward": 1.66,
+      "grader_score": 0.831
+    },
+    {
+      "task_name": "medium",
+      "score": 0.912,
+      "steps": 3,
+      "success": true,
+      "rewards": [0.41, 0.31, 1.11],
+      "total_reward": 1.83,
+      "grader_score": 0.912
+    },
+    {
+      "task_name": "hard",
+      "score": 0.001,
+      "steps": 4,
+      "success": false,
+      "rewards": [0.32, -0.23, -0.23, -0.18],
+      "total_reward": -0.32,
+      "grader_score": 0.001
+    },
+    {
+      "task_name": "bonus",
+      "score": 0.885,
+      "steps": 2,
+      "success": true,
+      "rewards": [0.45, 1.32],
+      "total_reward": 1.77,
+      "grader_score": 0.885
+    }
+  ],
+  "avg_score": 0.657,
+  "tasks_succeeded": 3,
+  "tasks_total": 4
+}
