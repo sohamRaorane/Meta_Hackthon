@@ -16,7 +16,7 @@ from server.graders import grade_task
 # API_BASE_URL = os.getenv("API_BASE_URL", "https://api.featherless.ai/v1")
 # MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.featherless.ai/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-1.5B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
 API_KEY = HF_TOKEN or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", "")
 
