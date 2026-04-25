@@ -1,4 +1,4 @@
-export type TransportType = 'metro' | 'bus' | 'auto' | 'train';
+export type TransportType = 'metro' | 'bus' | 'auto' | 'train' | 'walking' | 'cycling';
 
 export interface RouteData {
   id: string;

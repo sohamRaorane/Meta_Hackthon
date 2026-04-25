@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import MapView from '../components/MapView';
 import Sidebar from '../components/Sidebar';
+import NavSidebar from '../components/NavSidebar';
 import dummyRoutes from '../data/dummyRoutes';
-import type { RouteInputState } from '../types/route';
-import type { RouteData } from '../types/route';
+import type { RouteInputState, RouteData } from '../types/route';
 
 const getLocationCoordinates = (label: string, isSource: boolean): [number, number] => {
   const normalized = label.toLowerCase();
@@ -37,11 +37,18 @@ const MapPage: React.FC = () => {
 
   useEffect(() => {
     if (!inputState) {
-      navigate('/', { replace: true });
+      // For demo purposes, if no input state, provide dummy
+      const dummyInput: RouteInputState = {
+        source: 'Andheri, Railway Colony',
+        destination: 'Kurla, Station Brahmanwadi',
+        budget: 500,
+        time: 60
+      };
+      navigate('/map', { state: dummyInput, replace: true });
       return;
     }
 
-    const timer = window.setTimeout(() => setPageLoading(false), 300);
+    const timer = window.setTimeout(() => setPageLoading(false), 500);
     return () => window.clearTimeout(timer);
   }, [inputState, navigate]);
 
@@ -74,21 +81,26 @@ const MapPage: React.FC = () => {
     [inputState?.destination],
   );
 
-  if (!inputState) return null;
-
   if (pageLoading) {
     return (
-      <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center px-6">
-        <div className="animate-fade-in rounded-[32px] border border-slate-200 bg-white/90 p-12 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-          <p className="text-xl font-semibold text-slate-900">Preparing your Mumbai routes...</p>
+      <div className="flex h-screen items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <p className="text-sm font-bold text-slate-900 tracking-tight">Initializing Mumbai Map...</p>
         </div>
       </div>
     );
   }
 
+  if (!inputState) return null;
+
   return (
-    <main className="min-h-screen bg-slate-100 px-4 py-6 sm:px-8">
-      <div className="mx-auto grid max-w-[1600px] gap-6 lg:grid-cols-[420px_1fr]">
+    <div className="relative flex h-screen w-screen bg-slate-50 selection:bg-blue-100 selection:text-blue-900 overflow-hidden">
+      {/* 1. Main Navigation Icon Bar */}
+      <NavSidebar />
+
+      {/* 2. Directions Panel (Moves from Fixed to Flex for better layout) */}
+      <div className="z-40 w-[400px] flex-shrink-0 border-r border-slate-200 bg-white shadow-xl shadow-slate-200/50">
         <Sidebar
           inputState={inputState}
           routes={dummyRoutes}
@@ -97,34 +109,21 @@ const MapPage: React.FC = () => {
           onSelectRoute={handleSelectRoute}
           onRecalculate={handleRecalculate}
         />
-        <div className="flex min-h-[calc(100vh-3rem)] flex-col gap-4">
-          <div className="rounded-[32px] border border-slate-200 bg-white/95 p-5 shadow-sm">
-            <h1 className="text-3xl font-semibold text-slate-950">Explore routes on the map</h1>
-            <p className="mt-2 text-sm text-slate-600">Best route is highlighted and optimized for your budget.</p>
-          </div>
-          <div className="relative h-[calc(100vh-7rem)] overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
-            <div className="absolute left-5 top-5 z-20 flex flex-col gap-3 rounded-3xl border border-slate-200/70 bg-white/95 p-3 shadow-[0_20px_50px_rgba(15,23,42,0.12)] backdrop-blur-xl">
-              <div className="flex items-center gap-3 rounded-3xl border border-slate-200/90 bg-slate-50 px-4 py-2 text-sm text-slate-600 shadow-sm">
-                <span className="font-semibold text-slate-900">Search along the route</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm">Gas</button>
-                <button className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm">EV charging</button>
-                <button className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm">Hotels</button>
-              </div>
-            </div>
-            <MapView
-              routes={dummyRoutes}
-              selectedRouteId={selectedRouteId}
-              onSelectRoute={handleSelectRoute}
-              source={sourceCoords}
-              destination={destinationCoords}
-            />
-          </div>
-        </div>
       </div>
-    </main>
+
+      {/* 3. Main Map Content */}
+      <main className="relative flex-1 h-full">
+        <MapView
+          routes={dummyRoutes}
+          selectedRouteId={selectedRouteId}
+          onSelectRoute={handleSelectRoute}
+          source={sourceCoords}
+          destination={destinationCoords}
+        />
+      </main>
+    </div>
   );
 };
 
 export default MapPage;
+

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MapPin, Navigation, DollarSign, Clock, ArrowRight } from 'lucide-react';
 import type { RouteInputState } from '../types/route';
 
 interface InputFormProps {
@@ -25,12 +26,12 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit }) => {
     const parsedTime = Number(time);
 
     if (!parsedBudget || parsedBudget <= 0) {
-      setError('Please enter a valid budget greater than zero.');
+      setError('Please enter a valid budget.');
       return;
     }
 
     if (!parsedTime || parsedTime <= 0) {
-      setError('Please enter a valid travel time greater than zero.');
+      setError('Please enter a valid travel time.');
       return;
     }
 
@@ -43,56 +44,103 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <div>
-        <label className="block text-sm font-medium text-slate-700">Source location</label>
-        <input
-          value={source}
-          onChange={(event) => setSource(event.target.value)}
-          placeholder="e.g. Andheri East"
-          className="mt-2 w-full rounded-[28px] border border-slate-200 bg-slate-950/5 px-4 py-3 text-slate-950 shadow-sm shadow-cyan-200/10 transition focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-200/70"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700">Destination location</label>
-        <input
-          value={destination}
-          onChange={(event) => setDestination(event.target.value)}
-          placeholder="e.g. Kurla"
-          className="mt-2 w-full rounded-[28px] border border-slate-200 bg-slate-950/5 px-4 py-3 text-slate-950 shadow-sm shadow-cyan-200/10 transition focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-200/70"
-        />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="block text-sm font-medium text-slate-700">Budget (INR)</label>
-          <input
-            type="number"
-            value={budget}
-            onChange={(event) => setBudget(event.target.value)}
-            placeholder="e.g. 100"
-            className="mt-2 w-full rounded-[28px] border border-slate-200 bg-slate-950/5 px-4 py-3 text-slate-950 shadow-sm shadow-cyan-200/10 transition focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-200/70"
-          />
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-5">
+        {/* Source Input */}
+        <div className="relative group">
+          <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500 group-focus-within:text-blue-400 transition-colors">
+            Starting Point
+          </label>
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+              <MapPin size={18} />
+            </div>
+            <input
+              value={source}
+              onChange={(event) => setSource(event.target.value)}
+              placeholder="e.g. Andheri, Mumbai"
+              className="w-full rounded-2xl border border-white/5 bg-white/5 py-4 pl-12 pr-4 text-sm font-medium text-white placeholder:text-slate-600 transition-all focus:border-blue-500/50 focus:bg-white/10 focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700">Max travel time (min)</label>
-          <input
-            type="number"
-            value={time}
-            onChange={(event) => setTime(event.target.value)}
-            placeholder="e.g. 45"
-            className="mt-2 w-full rounded-[28px] border border-slate-200 bg-slate-950/5 px-4 py-3 text-slate-950 shadow-sm shadow-cyan-200/10 transition focus:border-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-200/70"
-          />
+
+        {/* Destination Input */}
+        <div className="relative group">
+          <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500 group-focus-within:text-emerald-400 transition-colors">
+            Where to?
+          </label>
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-emerald-400 transition-colors">
+               <Navigation size={18} className="rotate-45" />
+            </div>
+            <input
+              value={destination}
+              onChange={(event) => setDestination(event.target.value)}
+              placeholder="e.g. Kurla Station"
+              className="w-full rounded-2xl border border-white/5 bg-white/5 py-4 pl-12 pr-4 text-sm font-medium text-white placeholder:text-slate-600 transition-all focus:border-emerald-500/50 focus:bg-white/10 focus:outline-none focus:ring-4 focus:ring-emerald-500/10"
+            />
+          </div>
         </div>
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        {/* Budget Input */}
+        <div className="relative group">
+          <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500 group-focus-within:text-blue-400 transition-colors">
+            Budget (₹)
+          </label>
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+              <DollarSign size={18} />
+            </div>
+            <input
+              type="number"
+              value={budget}
+              onChange={(event) => setBudget(event.target.value)}
+              placeholder="Max cost"
+              className="w-full rounded-2xl border border-white/5 bg-white/5 py-4 pl-12 pr-4 text-sm font-medium text-white placeholder:text-slate-600 transition-all focus:border-blue-500/50 focus:bg-white/10 focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+            />
+          </div>
+        </div>
+
+        {/* Time Input */}
+        <div className="relative group">
+          <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-slate-500 group-focus-within:text-blue-400 transition-colors">
+            Time (min)
+          </label>
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+              <Clock size={18} />
+            </div>
+            <input
+              type="number"
+              value={time}
+              onChange={(event) => setTime(event.target.value)}
+              placeholder="Max duration"
+              className="w-full rounded-2xl border border-white/5 bg-white/5 py-4 pl-12 pr-4 text-sm font-medium text-white placeholder:text-slate-600 transition-all focus:border-blue-500/50 focus:bg-white/10 focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+            />
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-xl bg-red-500/10 p-3 text-xs font-bold text-red-500 border border-red-500/20">
+          {error}
+        </div>
+      )}
+
       <button
         type="submit"
-        className="w-full rounded-full bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 px-6 py-3 text-white shadow-[0_12px_30px_rgba(56,189,248,0.35)] transition duration-300 hover:shadow-[0_18px_48px_rgba(56,189,248,0.45)]"
+        className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-blue-600 py-5 text-sm font-black uppercase tracking-widest text-white transition-all hover:bg-blue-500 hover:shadow-[0_0_40px_rgba(37,99,235,0.4)] active:scale-[0.98]"
       >
-        Find Routes
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+        <span>Analyze Routes</span>
+        <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
       </button>
     </form>
   );
 };
 
 export default InputForm;
+
+
