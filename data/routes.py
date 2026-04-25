@@ -167,6 +167,7 @@ WEATHER_MODIFIERS = {
         "bus_time_factor":    1.3,
         "train_availability": 0.85,
         "metro_availability": 0.95,
+        "walk_availability":  0.55,
     },
 }
 
@@ -330,3 +331,17 @@ TASKS = {
         "max_steps":                 4,
     },
 }
+
+# ── DISRUPTION POOL ──────────────────────────────────────────────
+# Dynamic disruptions that can be injected during episodes.
+# Paper 2408.10215: environment should have realistic stochasticity
+DISRUPTION_POOL = [
+    "Signal failure reported — train services suspended on this corridor.",
+    "Auto strike in progress — no autos available anywhere.",
+    "Flash flooding — bus routes diverted, 20 min delays.",
+    "Metro overcrowding — 15 min queue at current station.",
+    "Police checkpoint — road traffic at standstill.",
+    "Power outage — metro suspended until further notice.",
+    "Sudden heavy rain — all road-based transport slowing down.",
+    "Procession blocking main road — bus cannot proceed.",
+]

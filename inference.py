@@ -61,56 +61,48 @@ def log_end(success: bool, steps: int,
 
 SYSTEM_PROMPT = """You are an expert Mumbai commuter agent navigating a MULTI-LEG journey.
 
-You will be given one leg at a time. Budget and time carry over between legs.
+Before choosing a transport mode, you MUST reason through ALL FOUR sections below.
+This structured reasoning is required — do not skip any section.
 
-═══════════════════════════════════════════
-MULTI-LEG AWARENESS
-═══════════════════════════════════════════
-You will see: [Leg X of Y] at the top.
-- Leg 1 of 3: spend max 40% of budget here
-- Leg 2 of 3: keep at least ₹20 for final leg
-- Final leg: spend freely
+═══════════════════════════════════════
+SECTION 1: SITUATION ASSESSMENT
+═══════════════════════════════════════
+State the current leg (X of Y), time remaining, budget remaining, and weather.
+Example: "Leg 2 of 3. Time: 45min. Budget: ₹40. Weather: heavy_rain."
 
-RAIN RULES:
-- heavy_rain → NEVER pick auto. Metro first choice.
-- heavy_rain → Bus 30-50% slower. Last resort only.
-- light_rain → Prefer metro/train over auto.
+═══════════════════════════════════════
+SECTION 2: ELIMINATION ROUND
+═══════════════════════════════════════
+List every mode and state whether it is ELIMINATED or VIABLE with one reason.
+Example:
+  train: ELIMINATED — Western line signal failure confirmed
+  auto:  ELIMINATED — heavy_rain + confidence 0.3, availability near zero
+  bus:   VIABLE — available, confirmed, ₹15
+  metro: VIABLE — weather-proof, confirmed, ₹40 within budget
+  walk:  ELIMINATED — 300min, time remaining only 45min
 
-DISRUPTION RULES:
-- "Harbour line delayed" → no train
-- "Western line signal failure" → no train, use metro
-- "signal failure" → treat train as unavailable
-- "bus diverted" or "bus suspended" → no bus
-- "auto strike" → no auto
-- Confidence below 0.5 → treat as unavailable
-
-BUDGET RULES:
-- Never pick mode costing more than budget_remaining
-- Budget under ₹20 → only train or bus
-- Budget under ₹50 → no auto
-
-TIME RULES:
-- Under 15 min → fastest mode only
-- Under 25 min → no bus
-- Under 30 min with legs remaining → metro or train only
-
-PRIORITY: metro > train > auto > bus > walk
-
-WEIGHTED SCORING (apply mentally):
+═══════════════════════════════════════
+SECTION 3: SCORE THE VIABLE MODES
+═══════════════════════════════════════
+For each VIABLE mode, compute:
   time_score   = 1.0 - (est_time_min / time_remaining)
   cost_score   = 1.0 - (est_cost / budget_remaining)
-  reliability  = confidence * availability
-  total = (time_score*0.4) + (cost_score*0.3) + (reliability*0.3)
-  Penalize -0.5 for auto in rain.
+  reliability  = confidence value shown
+  total = (time_score * 0.4) + (cost_score * 0.3) + (reliability * 0.3)
 
-MID-JOURNEY REPLAN:
-- If event says "Re-plan now": cancel previous plan, pick fresh.
+Show the calculation. Pick the highest total.
 
-OUTPUT FORMAT — ONLY THIS JSON, NOTHING ELSE:
-{"mode": "metro", "reason": "Leg 1 of 2: metro scores highest — 20min, ₹40, confidence 1.0, weather-proof."}
+═══════════════════════════════════════
+SECTION 4: DECISION
+═══════════════════════════════════════
+State your final choice and the single most important reason.
 
-mode must be exactly one of: metro / train / auto / bus / walk
-No markdown. No backticks. No extra text.
+═══════════════════════════════════════
+OUTPUT — AFTER YOUR REASONING, OUTPUT ONLY THIS JSON ON THE LAST LINE:
+{"mode": "metro", "reason": "Leg 2 of 3: metro scores 0.87 vs bus 0.52. Weather-proof, within budget."}
+
+mode must be exactly: metro / train / auto / bus / walk
+The JSON must be the last line of your response. Nothing after it.
 """
 
 # ── Server calls ─────────────────────────────────────────────────
@@ -141,37 +133,51 @@ def ask_model(client: OpenAI, situation: str, mid_event: str = None) -> dict:
     if mid_event:
         prompt = f"MID-JOURNEY EVENT — RE-PLAN:\n{mid_event}\n\n{situation}"
 
-    try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            max_tokens=150,
-            temperature=0.1,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user",   "content": prompt},
-            ],
-        )
-        raw = response.choices[0].message.content.strip()
-    except Exception as e:
-        return {"mode": "bus", "reason": f"API error: {str(e)[:50]}"}
+    # Retry logic with exponential backoff: 1s, 2s, 4s
+    import time
+    max_attempts = 3
+    backoff_seconds = [1, 2, 4]
+    
+    for attempt in range(max_attempts):
+        try:
+            response = client.chat.completions.create(
+                model=MODEL_NAME,
+                max_tokens=150,
+                temperature=0.1,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user",   "content": prompt},
+                ],
+            )
+            raw = response.choices[0].message.content.strip()
+        except Exception as e:
+            if attempt < max_attempts - 1:
+                wait_time = backoff_seconds[attempt]
+                time.sleep(wait_time)
+                continue
+            else:
+                return {"mode": "bus", "reason": f"API error after {max_attempts} attempts: {str(e)[:40]}"}
 
-    # Strip markdown fences
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
+        # Strip markdown fences
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
 
-    try:
-        decision = json.loads(raw)
-        if decision.get("mode") not in ["metro","train","auto","bus","walk"]:
-            raise ValueError("invalid mode")
-        return decision
-    except (json.JSONDecodeError, ValueError):
-        for mode in ["metro","train","bus","auto","walk"]:
-            if mode in raw.lower():
-                return {"mode": mode, "reason": f"parsed from: {raw[:60]}"}
-        return {"mode": "bus", "reason": "fallback"}
+        try:
+            decision = json.loads(raw)
+            if decision.get("mode") not in ["metro","train","auto","bus","walk"]:
+                raise ValueError("invalid mode")
+            return decision
+        except (json.JSONDecodeError, ValueError):
+            for mode in ["metro","train","bus","auto","walk"]:
+                if mode in raw.lower():
+                    return {"mode": mode, "reason": f"parsed from: {raw[:60]}"}
+            return {"mode": "bus", "reason": "fallback"}
+    
+    # Should not reach here
+    return {"mode": "bus", "reason": "max_attempts exhausted"}
 
 # ── Task runner ──────────────────────────────────────────────────
 
@@ -224,8 +230,8 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
             if obs.get("mid_journey_update"):
                 pending_event = obs["mid_journey_update"]
 
-        # Check success: reached destination
-        success = obs["current_location"] == obs["destination"]
+        # Check success: reached final destination
+        success = bool(final_obs.get("reached", False))
 
     except Exception as e:
         error_msg = str(e)[:80]
@@ -233,9 +239,6 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
 
     # Normalize total reward to [0, 1]
     total_reward = sum(rewards)
-    max_reward   = MAX_REWARD_PER_TASK.get(task_name, 2.0)
-    raw_score = total_reward / max_reward
-    score = round(min(max(raw_score, 0.001), 0.999), 3)
     grader_score = grade_task(task_name, final_obs, rewards, steps_taken)
 
     log_end(

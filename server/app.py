@@ -139,6 +139,28 @@ def health():
     return {"status": "healthy", "active_sessions": len(ENV_STORE)}
 
 
+@app.get("/tasks")
+def list_tasks():
+    """
+    Returns metadata for all available tasks.
+    Judges can explore task difficulty without reading source code.
+    """
+    from data.routes import TASKS
+    return {
+        name: {
+            "origin":      cfg["origin"],
+            "destination": cfg["destination"],
+            "legs":        len(cfg["legs"]),
+            "time_limit":  cfg["time_limit"],
+            "budget":      cfg["budget"],
+            "weather":     cfg["weather"],
+            "max_steps":   cfg["max_steps"],
+            "disruptions": cfg["disruptions"],
+        }
+        for name, cfg in TASKS.items()
+    }
+
+
 @app.get("/metadata")
 def metadata():
     return {
