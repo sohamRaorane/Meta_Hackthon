@@ -8,7 +8,7 @@
 import os
 import json
 import requests
-from typing import List, Optional
+from typing import Optional
 from openai import OpenAI
 from server.graders import grade_task
 
@@ -16,7 +16,7 @@ from server.graders import grade_task
 # API_BASE_URL = os.getenv("API_BASE_URL", "https://api.featherless.ai/v1")
 # MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.featherless.ai/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-1.5B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
 API_KEY = HF_TOKEN or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", "")
 
@@ -59,50 +59,30 @@ def log_end(success: bool, steps: int,
 
 # ── System Prompt ────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are an expert Mumbai commuter agent navigating a MULTI-LEG journey.
+SYSTEM_PROMPT = """You are a Mumbai commuter agent. You must pick the best transport mode for each leg of your journey.
 
-Before choosing a transport mode, you MUST reason through ALL FOUR sections below.
-This structured reasoning is required — do not skip any section.
+You will be given:
+- Your current leg (e.g., Leg 1 of 2)
+- Time remaining (minutes)
+- Budget remaining (₹)
+- Weather condition (clear / light_rain / heavy_rain)
+- Known disruptions on routes
+- Available transport modes with their cost, estimated time, and reliability
 
-═══════════════════════════════════════
-SECTION 1: SITUATION ASSESSMENT
-═══════════════════════════════════════
-State the current leg (X of Y), time remaining, budget remaining, and weather.
-Example: "Leg 2 of 3. Time: 45min. Budget: ₹40. Weather: heavy_rain."
+Rules to keep in mind:
+- In heavy rain, auto-rickshaws are often unavailable or unsafe. Prefer metro or train.
+- If a mode is marked unavailable, do not choose it.
+- Stay within your budget.
+- Prefer faster modes if time is low.
+- Metro and train are more reliable in bad weather.
+- Walk is slow. Use only last resort.
 
-═══════════════════════════════════════
-SECTION 2: ELIMINATION ROUND
-═══════════════════════════════════════
-List every mode and state whether it is ELIMINATED or VIABLE with one reason.
-Example:
-  train: ELIMINATED — Western line signal failure confirmed
-  auto:  ELIMINATED — heavy_rain + confidence 0.3, availability near zero
-  bus:   VIABLE — available, confirmed, ₹15
-  metro: VIABLE — weather-proof, confirmed, ₹40 within budget
-  walk:  ELIMINATED — 300min, time remaining only 45min
+Respond with ONLY one JSON object on the last line:
 
-═══════════════════════════════════════
-SECTION 3: SCORE THE VIABLE MODES
-═══════════════════════════════════════
-For each VIABLE mode, compute:
-  time_score   = 1.0 - (est_time_min / time_remaining)
-  cost_score   = 1.0 - (est_cost / budget_remaining)
-  reliability  = confidence value shown
-  total = (time_score * 0.4) + (cost_score * 0.3) + (reliability * 0.3)
+{"mode":"metro","reason":"Fastest reliable option within budget"}
 
-Show the calculation. Pick the highest total.
-
-═══════════════════════════════════════
-SECTION 4: DECISION
-═══════════════════════════════════════
-State your final choice and the single most important reason.
-
-═══════════════════════════════════════
-OUTPUT — AFTER YOUR REASONING, OUTPUT ONLY THIS JSON ON THE LAST LINE:
-{"mode": "metro", "reason": "Leg 2 of 3: metro scores 0.87 vs bus 0.52. Weather-proof, within budget."}
-
-mode must be exactly: metro / train / auto / bus / walk
-The JSON must be the last line of your response. Nothing after it.
+mode must be exactly one of:
+metro / train / auto / bus / walk
 """
 
 # ── Server calls ─────────────────────────────────────────────────
@@ -128,10 +108,34 @@ def call_step(episode_id: str, message: str) -> dict:
 
 # ── Model call ───────────────────────────────────────────────────
 
+def choose_fallback_mode(situation: str) -> str:
+    """Heuristic fallback so we do not always collapse to one fixed mode."""
+    text = (situation or "").lower()
+
+    if "heavy_rain" in text:
+        preferred = ["metro", "train", "bus", "walk"]
+    elif "light_rain" in text:
+        preferred = ["metro", "bus", "train", "auto", "walk"]
+    else:
+        preferred = ["metro", "train", "auto", "bus", "walk"]
+
+    for mode in preferred:
+        unavailable_markers = [
+            f"{mode}: unavailable",
+            f"{mode} unavailable",
+            f"{mode} - unavailable",
+        ]
+        if any(marker in text for marker in unavailable_markers):
+            continue
+        return mode
+
+    return "walk"
+
 def ask_model(client: OpenAI, situation: str, mid_event: str = None) -> dict:
-    prompt = situation
+    prompt = situation + "\n\nReturn ONLY a JSON object like {\"mode\":\"metro\",\"reason\":\"brief\"}"
     if mid_event:
-        prompt = f"MID-JOURNEY EVENT — RE-PLAN:\n{mid_event}\n\n{situation}"
+        if mid_event:
+            prompt = f"MID-JOURNEY EVENT — RE-PLAN:\n{mid_event}\n\n{situation}\n\nReturn ONLY a JSON object like {{\"mode\":\"metro\",\"reason\":\"brief\"}}"
 
     # Retry logic with exponential backoff: 1s, 2s, 4s
     import time
@@ -142,8 +146,9 @@ def ask_model(client: OpenAI, situation: str, mid_event: str = None) -> dict:
         try:
             response = client.chat.completions.create(
                 model=MODEL_NAME,
-                max_tokens=150,
+                max_tokens=80,
                 temperature=0.1,
+                response_format={"type": "json_object"},
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user",   "content": prompt},
@@ -156,7 +161,11 @@ def ask_model(client: OpenAI, situation: str, mid_event: str = None) -> dict:
                 time.sleep(wait_time)
                 continue
             else:
-                return {"mode": "bus", "reason": f"API error after {max_attempts} attempts: {str(e)[:40]}"}
+                mode = choose_fallback_mode(situation)
+                return {
+                    "mode": mode,
+                    "reason": f"fallback({mode}) after API error: {str(e)[:60]}",
+                }
 
         # Strip markdown fences
         if raw.startswith("```"):
@@ -171,10 +180,18 @@ def ask_model(client: OpenAI, situation: str, mid_event: str = None) -> dict:
                 raise ValueError("invalid mode")
             return decision
         except (json.JSONDecodeError, ValueError):
-            for mode in ["metro","train","bus","auto","walk"]:
-                if mode in raw.lower():
-                    return {"mode": mode, "reason": f"parsed from: {raw[:60]}"}
-            return {"mode": "bus", "reason": "fallback"}
+            raw_lower = raw.lower()
+
+            for mode in ["metro","train","auto","bus","walk"]:
+                if f'"mode":"{mode}"' in raw_lower or f'"mode": "{mode}"' in raw_lower:
+                 return {"mode": mode, "reason": "parsed json fragment"}
+
+            for mode in ["metro","train","auto","bus","walk"]:
+                if raw_lower.strip() == mode:
+                 return {"mode": mode, "reason": "single word"}
+
+            mode = choose_fallback_mode(situation)
+            return {"mode": mode, "reason": f"fallback({mode}) parse"}
     
     # Should not reach here
     return {"mode": "bus", "reason": "max_attempts exhausted"}
@@ -259,6 +276,11 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
 # ── Main ─────────────────────────────────────────────────────────
 
 def main():
+    if not API_KEY:
+        raise RuntimeError(
+            "No API key found. Set HF_TOKEN or OPENAI_API_KEY or API_KEY before running inference.py"
+        )
+
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
     for task_name in TASKS:
