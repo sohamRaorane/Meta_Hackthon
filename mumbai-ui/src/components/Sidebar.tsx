@@ -5,15 +5,16 @@ import {
   Train, 
   Navigation, 
   Bike, 
-  ArrowLeftRight, 
-  PlusCircle, 
-  Clock, 
-  ChevronDown, 
+  ArrowLeft,
   X,
   Target,
-  Smartphone
+  Bot,
+  CloudRain,
+  Sun,
+  Banknote,
+  Timer
 } from 'lucide-react';
-import type { RouteData, RouteInputState, TransportType } from '../types/route';
+import type { RouteData, RouteInputState } from '../types/route';
 import RouteCard from './RouteCard';
 
 interface SidebarProps {
@@ -23,6 +24,9 @@ interface SidebarProps {
   bestRouteId: string;
   onSelectRoute: (id: string) => void;
   onRecalculate: () => void;
+  agentPhase?: 'analyzing' | 'highlighted' | 'decided';
+  taskName?: string;
+  taskMeta?: any;
 }
 
 const transportIcons: Record<string, React.ReactNode> = {
@@ -41,6 +45,15 @@ const Sidebar: React.FC<SidebarProps> = ({
   bestRouteId,
   onSelectRoute,
   onRecalculate,
+  agentPhase = 'decided',
+  taskMeta = {
+    weather: 'clear',
+    legs: ['Origin → Dest'],
+    disruptions: [],
+    timeLimit: 60,
+    budget: 100,
+    difficulty: 'Easy'
+  }
 }) => {
   const modes: { label: string; type: string; info?: string }[] = [
     { label: 'Best', type: 'best' },
@@ -50,128 +63,169 @@ const Sidebar: React.FC<SidebarProps> = ({
     { label: '2h 5m', type: 'walking', info: '2h 5m' },
   ];
 
+  const bestRoute = routes.find(r => r.id === bestRouteId);
+  const usedMode = bestRoute?.transport_type || 'auto';
+  const allModes = ['auto', 'bus', 'metro', 'train', 'walking', 'cycling'];
+  const doNotUseModes = allModes.filter(m => m !== usedMode && routes.some(r => r.transport_type === m));
+
+  const renderAnalyzingPhase = () => (
+    <div className="flex-1 p-6 space-y-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Bot size={24} className="text-purple-600 animate-[pulse-glow_2s_infinite]" />
+        <h2 className="text-xl font-bold font-['Space_Grotesk']">AI Agent Analyzing Route...</h2>
+      </div>
+      
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+           <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase">
+             {taskMeta.weather === 'clear' ? <Sun size={14} /> : <CloudRain size={14} />} 
+             {taskMeta.weather.replace('_', ' ')}
+           </span>
+           <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold uppercase">
+             <Banknote size={14} /> ₹{taskMeta.budget}
+           </span>
+           <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase">
+             <Timer size={14} /> {taskMeta.timeLimit} MIN
+           </span>
+        </div>
+        
+        <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl space-y-4 mt-6">
+          {taskMeta.legs.map((leg: string, idx: number) => (
+             <div key={idx} className="flex items-center gap-3 leg-step" style={{animationDelay: `${idx * 0.5}s`, opacity: 0}}>
+                <div className="h-3 w-3 rounded-full bg-blue-500 animate-[pulse-glow_1.5s_infinite]" />
+                <span className="text-sm font-semibold text-slate-700">Evaluating: {leg}</span>
+             </div>
+          ))}
+        </div>
+        
+        <div className="relative h-1.5 w-full bg-slate-100 rounded-full overflow-hidden mt-8">
+           <div className="absolute top-0 bottom-0 left-0 bg-gradient-to-r from-blue-500 to-purple-500 animate-[shimmer_2s_linear_infinite] w-1/2" style={{backgroundSize: '200% 100%'}} />
+        </div>
+        <p className="text-xs text-center text-slate-400 font-bold tracking-widest uppercase mt-2 animate-[blink_1s_infinite]">Evaluating all transport modes...</p>
+      </div>
+    </div>
+  );
+
+  const renderHighlightedPhase = () => (
+    <div className="flex-1 p-6 flex flex-col items-center justify-center space-y-4">
+       <Bot size={48} className="text-purple-600 animate-bounce" />
+       <h2 className="text-xl font-bold font-['Space_Grotesk'] text-center">Route found!<br/>Highlighting optimal path...</h2>
+    </div>
+  );
+
+  const renderDecidedPhase = () => (
+    <div className="flex-1 overflow-y-auto bg-slate-50 custom-scrollbar pb-6 space-y-4">
+      {/* Agent Decision Card */}
+      <div className="m-4 rounded-2xl p-5 agent-decision-card">
+        <div className="flex items-center gap-2 mb-4">
+          <Bot size={20} className="text-purple-700" />
+          <h3 className="text-sm font-black uppercase tracking-widest text-purple-700">Agent Decision</h3>
+        </div>
+        
+        <h4 className="font-['Space_Grotesk'] font-bold text-lg mb-4">RECOMMENDED ROUTE</h4>
+        
+        <div className="space-y-3 mb-6 bg-white/60 p-4 rounded-xl border border-white/40">
+           <div className="flex items-center gap-2">
+             <span className="font-bold text-sm">✅ USE:</span>
+             <span className="transport-pill-use">{usedMode}</span>
+           </div>
+           
+           <div className="flex flex-wrap items-center gap-2">
+             <span className="font-bold text-sm">❌ AVOID:</span>
+             <div className="flex gap-2 flex-wrap">
+               {doNotUseModes.map(m => (
+                 <span key={m} className="transport-pill-nouse text-xs uppercase font-bold">{m}</span>
+               ))}
+             </div>
+           </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4 mb-4 text-sm font-bold bg-white/40 p-3 rounded-lg">
+           <div>
+             <span className="text-slate-500 block text-xs">Reward Score</span>
+             <div className="flex items-center gap-2">
+                <div className="h-1.5 flex-1 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500" style={{width: `${(bestRoute?.reward_score || 0) * 100}%`}} />
+                </div>
+                <span>{(bestRoute?.reward_score || 0).toFixed(2)}</span>
+             </div>
+           </div>
+           <div>
+              <span className="text-slate-500 block text-xs">Time / Cost</span>
+              <span className="text-slate-900">{bestRoute?.time} min / ₹{bestRoute?.cost}</span>
+           </div>
+           <div className="uppercase">
+              <span className="text-slate-500 block text-xs">Weather</span>
+              <span className="text-slate-900">{taskMeta.weather.replace('_', ' ')}</span>
+           </div>
+           <div>
+              <span className="text-slate-500 block text-xs">Legs</span>
+              <span className="text-slate-900">{taskMeta.legs.length} legs</span>
+           </div>
+        </div>
+
+        <div className="mt-4">
+          <span className="block text-xs font-bold text-slate-500 mb-1">Why this route?</span>
+          <p className="text-sm font-medium text-slate-800 italic border-l-2 border-purple-400 pl-3">
+             "{bestRoute?.description} Selected based on your ₹{taskMeta.budget} budget under {taskMeta.weather.replace('_', ' ')} conditions."
+          </p>
+        </div>
+      </div>
+      
+      <div className="px-5 pt-2 pb-1 border-b border-slate-200">
+         <h4 className="text-xs font-black uppercase tracking-widest text-slate-400">All Available Routes</h4>
+      </div>
+
+      <div className="divide-y divide-slate-100">
+        {routes.map((route) => {
+          const isBest = route.id === bestRouteId;
+          const isSelected = route.id === selectedRouteId;
+          
+          return (
+            <div key={route.id} className="relative">
+              <RouteCard
+                route={route}
+                selected={isSelected}
+                best={isBest}
+                onSelect={onSelectRoute}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
     <aside className="relative flex h-full w-full flex-col bg-white overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4">
+      {/* Header Tabs */}
+      <div className="flex items-center justify-between px-4 pt-4 shrink-0">
         <div className="flex gap-4 border-b w-full pb-1">
-          {modes.slice(0, 5).map((mode, i) => (
-            <button key={i} className={`flex flex-col items-center pb-2 px-1 relative transition-colors ${i === 0 ? 'text-blue-600 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-600' : 'text-slate-500 hover:text-slate-900'}`}>
-              <div className="mb-1">{transportIcons[mode.type]}</div>
-              <span className="text-[10px] font-medium">{mode.label}</span>
-            </button>
-          ))}
+          {modes.slice(0, 5).map((mode, i) => {
+             const tabRoute = routes.find(r => r.transport_type === mode.type) || (mode.type === 'best' ? bestRoute : null);
+             
+             return (
+              <button 
+                key={i} 
+                onClick={() => tabRoute && onSelectRoute(tabRoute.id)}
+                className={`flex flex-col items-center pb-2 px-1 relative transition-colors ${i === 0 || (tabRoute && tabRoute.id === selectedRouteId) ? 'text-blue-600 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-600' : 'text-slate-500 hover:text-slate-900'}`}
+              >
+                <div className="mb-1">{transportIcons[mode.type] || <Car size={34}/>}</div>
+                <span className="text-[10px] font-medium">{mode.label}</span>
+              </button>
+             );
+          })}
           <button className="flex items-center justify-center pb-2 text-slate-500">
             <X size={20} />
           </button>
         </div>
       </div>
 
-      {/* Inputs */}
-      <div className="relative px-4 py-4 space-y-2">
-        <div className="absolute right-6 top-1/2 -translate-y-1/2 z-10">
-          <button className="p-1 rounded-full border border-slate-200 bg-white shadow-sm hover:bg-slate-50">
-            <ArrowLeftRight size={16} className="rotate-90 text-slate-600" />
-          </button>
-        </div>
-
-        <div className="relative flex items-center gap-3">
-          <div className="flex flex-col items-center gap-1 mt-1">
-            <div className="h-4 w-4 rounded-full border-2 border-slate-400 bg-white" />
-            <div className="w-[2px] h-10 border-l-2 border-dotted border-slate-300" />
-            <div className="h-5 w-4 flex justify-center">
-               <div className="w-1 h-3 rounded-full bg-slate-400" />
-            </div>
-          </div>
-          <div className="flex-1 space-y-2">
-            <div className="relative">
-              <input 
-                type="text" 
-                defaultValue={inputState.source}
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-            <div className="relative">
-              <input 
-                type="text" 
-                defaultValue={inputState.destination}
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-          </div>
-        </div>
-
-        <button className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 pt-1">
-          <PlusCircle size={18} />
-          <span>Add destination</span>
-        </button>
-      </div>
-
-      {/* Options */}
-      <div className="flex items-center justify-between border-y border-slate-100 px-6 py-4 bg-slate-50/50">
-        <button className="btn-premium">
-          <Clock size={16} />
-          <span>Leave now</span>
-          <ChevronDown size={14} className="text-slate-400" />
-        </button>
-        <button className="text-sm font-black text-blue-600 hover:text-blue-700 transition-colors" onClick={onRecalculate}>
-          ROUTE OPTIONS
-        </button>
-      </div>
-
-      {/* Route List */}
-      <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
-         <div className="px-6 py-3 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50/30 border-b border-blue-50">
-            <div className="flex items-center gap-2">
-              <Smartphone size={14} />
-              <span>Send to Phone</span>
-            </div>
-            <button className="hover:text-blue-800 transition-colors">
-              COPY LINK
-            </button>
-         </div>
-
-        <div className="divide-y divide-slate-100">
-          {routes.map((route) => {
-            const isBest = route.id === bestRouteId;
-            const isSelected = route.id === selectedRouteId;
-            
-            return (
-              <div key={route.id} className="relative">
-                {isBest && (
-                  <div className="absolute left-6 top-2 z-10 rounded-full bg-emerald-500 px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-white shadow-sm">
-                    Recommended
-                  </div>
-                )}
-                <RouteCard
-                  route={route}
-                  selected={isSelected}
-                  best={isBest}
-                  onSelect={onSelectRoute}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="p-4 mt-2">
-           <h3 className="text-sm font-semibold text-slate-900 mb-4">Explore nearby Kurla</h3>
-           <div className="flex items-center gap-3 p-4 rounded-2xl bg-blue-50 border border-blue-100">
-             <div className="p-2 rounded-full bg-white text-blue-600">
-               <PlusCircle size={20} />
-             </div>
-             <p className="text-xs text-slate-600 leading-tight">
-               New! Continue your trip, tap the notification on your phone to get directions
-             </p>
-             <button className="ml-auto text-slate-400">
-               <X size={16} />
-             </button>
-           </div>
-        </div>
-      </div>
+      {agentPhase === 'analyzing' && renderAnalyzingPhase()}
+      {agentPhase === 'highlighted' && renderHighlightedPhase()}
+      {agentPhase === 'decided' && renderDecidedPhase()}
     </aside>
   );
 };
 
 export default Sidebar;
-

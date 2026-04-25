@@ -131,12 +131,18 @@ const InputForm: React.FC<InputFormProps> = ({ onSubmit }) => {
 
       <button
         type="submit"
-        className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-blue-600 py-5 text-sm font-black uppercase tracking-widest text-white transition-all hover:bg-blue-500 hover:shadow-[0_0_40px_rgba(37,99,235,0.4)] active:scale-[0.98]"
+        className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-5 text-sm font-black uppercase tracking-widest text-white transition-all hover:bg-blue-500 hover:shadow-[0_0_40px_rgba(37,99,235,0.4)] active:scale-[0.98] animate-[pulse-glow_3s_infinite]"
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-        <span>Analyze Routes</span>
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+        <span>Run AI Agent</span>
         <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
       </button>
+
+      <div className="pt-4 text-center">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1 text-[10px] font-semibold text-slate-400">
+          Powered by GRPO-Trained Qwen 2.5 · Meta Hackathon 2025
+        </span>
+      </div>
     </form>
   );
 };

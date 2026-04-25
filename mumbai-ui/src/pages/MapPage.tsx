@@ -6,6 +6,64 @@ import NavSidebar from '../components/NavSidebar';
 import dummyRoutes from '../data/dummyRoutes';
 import type { RouteInputState, RouteData } from '../types/route';
 
+const matchTaskFromInput = (source: string, destination: string): string => {
+  const s = source?.toLowerCase() || '';
+  const d = destination?.toLowerCase() || '';
+  
+  if ((s.includes('andheri') && d.includes('kurla')) || 
+      (s.includes('andheri east') && d.includes('kurla'))) {
+    return 'easy';
+  }
+  if ((s.includes('borivali') && d.includes('cst')) ||
+      (s.includes('borivali') && d.includes('chhatrapati'))) {
+    return 'medium';
+  }
+  if ((s.includes('churchgate') && d.includes('bkc')) ||
+      (s.includes('churchgate') && d.includes('bandra kurla'))) {
+    return 'hard';
+  }
+  if ((s.includes('bandra') && d.includes('juhu')) ||
+      (s.includes('bandra station') && d.includes('juhu'))) {
+    return 'bonus';
+  }
+  return 'easy';
+};
+
+const TASK_META = {
+  easy: {
+    weather: 'clear',
+    legs: ['Andheri East → Ghatkopar', 'Ghatkopar → Kurla Station'],
+    disruptions: ['Harbour line delayed 20 min'],
+    timeLimit: 60,
+    budget: 120,
+    difficulty: 'Easy'
+  },
+  medium: {
+    weather: 'heavy_rain',
+    legs: ['Borivali → Andheri', 'Andheri → Ghatkopar', 'Ghatkopar → CST'],
+    disruptions: ['Heavy rain — auto availability very low', 'Western line slow'],
+    timeLimit: 90,
+    budget: 80,
+    difficulty: 'Medium'
+  },
+  hard: {
+    weather: 'heavy_rain',
+    legs: ['Churchgate → Dadar', 'Dadar → CST', 'CST → Kurla', 'Kurla → BKC'],
+    disruptions: ['Western line signal failure', 'Heavy rain', 'Auto strike South Mumbai'],
+    timeLimit: 85,
+    budget: 75,
+    difficulty: 'Hard'
+  },
+  bonus: {
+    weather: 'light_rain',
+    legs: ['Bandra → Andheri', 'Andheri → Juhu Beach'],
+    disruptions: ['Light rain — auto fares surging', 'Bus delays 10 min'],
+    timeLimit: 40,
+    budget: 30,
+    difficulty: 'Bonus'
+  }
+};
+
 const getLocationCoordinates = (label: string, isSource: boolean): [number, number] => {
   const normalized = label.toLowerCase();
   if (normalized.includes('andheri')) return [19.1194, 72.8468];
@@ -34,6 +92,10 @@ const MapPage: React.FC = () => {
   const inputState = location.state as RouteInputState | null;
   const [selectedRouteId, setSelectedRouteId] = useState<string>('');
   const [pageLoading, setPageLoading] = useState(true);
+  const [agentPhase, setAgentPhase] = useState<'analyzing' | 'highlighted' | 'decided'>('analyzing');
+
+  const taskName = matchTaskFromInput(inputState?.source || '', inputState?.destination || '') as keyof typeof TASK_META;
+  const taskMeta = TASK_META[taskName];
 
   useEffect(() => {
     if (!inputState) {
@@ -51,6 +113,28 @@ const MapPage: React.FC = () => {
     const timer = window.setTimeout(() => setPageLoading(false), 500);
     return () => window.clearTimeout(timer);
   }, [inputState, navigate]);
+
+  useEffect(() => {
+    if (!inputState) return;
+    
+    // Phase 1: Agent analyzing (show immediately)
+    setAgentPhase('analyzing');
+    
+    // Phase 2: Route highlighted on map after 2.5s
+    const t1 = setTimeout(() => {
+      setAgentPhase('highlighted');
+    }, 2500);
+    
+    // Phase 3: Full decision shown after 4s
+    const t2 = setTimeout(() => {
+      setAgentPhase('decided');
+    }, 4000);
+    
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [inputState]);
 
   const bestRoute = useMemo(() => {
     if (!inputState) return null;
@@ -83,10 +167,12 @@ const MapPage: React.FC = () => {
 
   if (pageLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-white">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-          <p className="text-sm font-bold text-slate-900 tracking-tight">Initializing Mumbai Map...</p>
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <div className="flex flex-col items-center gap-6">
+          <div className="text-6xl animate-pulse">🚆</div>
+          <p className="text-sm font-bold text-white tracking-tight animate-pulse font-['Space_Grotesk']">
+            AI Agent initializing environment...
+          </p>
         </div>
       </div>
     );
@@ -108,6 +194,9 @@ const MapPage: React.FC = () => {
           bestRouteId={bestRoute?.id ?? ''}
           onSelectRoute={handleSelectRoute}
           onRecalculate={handleRecalculate}
+          agentPhase={agentPhase}
+          taskName={taskName}
+          taskMeta={taskMeta}
         />
       </div>
 

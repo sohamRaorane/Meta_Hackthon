@@ -11,17 +11,35 @@ const Home: React.FC = () => {
   };
 
   return (
-    <main className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-slate-950 px-4 py-20">
+    <main className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-[var(--bg-home)] px-4 py-20 font-['DM_Sans']">
       {/* Background Decorative Elements */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute left-[-10%] top-[-10%] h-[500px] w-[500px] rounded-full bg-blue-600/20 blur-[120px]" />
-        <div className="absolute right-[-5%] bottom-[-5%] h-[400px] w-[400px] rounded-full bg-emerald-500/10 blur-[100px]" />
+        <div className="absolute left-[10%] top-[20%] h-3 w-3 rounded-full bg-blue-500 shadow-[0_0_15px_#2563eb] animate-pulse" />
+        <div className="absolute right-[20%] top-[30%] h-4 w-4 rounded-full bg-amber-500 shadow-[0_0_20px_#f59e0b] animate-pulse" style={{ animationDelay: '1s' }} />
         
         {/* Animated Transportation Lines */}
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-[20%] left-0 h-[100px] w-full border-t border-b border-blue-500/30 -rotate-3" />
-          <div className="absolute top-[50%] left-0 h-[60px] w-full border-t border-b border-emerald-500/20 rotate-6" />
-        </div>
+        <div className="absolute inset-x-0 bottom-0 h-[200px] bg-gradient-to-t from-blue-900/20 to-transparent" />
+        
+        {/* SVG Silhouette */}
+        <svg className="absolute bottom-0 left-0 w-full h-auto opacity-30" viewBox="0 0 1440 320" preserveAspectRatio="none">
+          <path fill="#ffffff" fillOpacity="0.05" d="M0,160L48,149.3C96,139,192,117,288,128C384,139,480,181,576,192C672,203,768,181,864,154.7C960,128,1056,96,1152,90.7C1248,85,1344,107,1392,117.3L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+        </svg>
+
+        {/* Floating particles */}
+        {['🚇', '🚌', '🛺', '🚆', '🚶'].map((emoji, index) => (
+          <div 
+            key={index} 
+            className="absolute text-3xl opacity-0"
+            style={{ 
+               left: `${20 + index * 15}%`, 
+               bottom: '-20px',
+               animation: 'float-up 8s linear infinite',
+               animationDelay: `${index * 1.5}s`
+            }}
+          >
+            {emoji}
+          </div>
+        ))}
       </div>
 
       <div className="relative z-10 w-full max-w-xl">
@@ -42,12 +60,11 @@ const Home: React.FC = () => {
             <span className="text-[10px] font-bold uppercase tracking-[0.6em] text-blue-400">
               Mumbai Connect
             </span>
-            <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
-              Route Planner
+            <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-emerald-400 sm:text-5xl font-['Space_Grotesk'] animate-[shimmer_3s_linear_infinite]" style={{backgroundSize: '200% auto'}}>
+              Mumbai AI Navigator
             </h1>
-            <p className="mt-4 text-sm font-medium leading-relaxed text-slate-400">
-              Optimize your daily commute through Mumbai's vast <br />
-              network of trains, buses, and metro lines.
+            <p className="mt-4 text-sm font-medium leading-relaxed text-slate-400 font-['DM_Sans']">
+              Your AI agent finds the smartest multi-leg route through Mumbai's chaos
             </p>
           </div>
 
@@ -57,7 +74,7 @@ const Home: React.FC = () => {
                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500/20 text-blue-400">
                  <NavIcon size={16} />
                </div>
-               <h2 className="text-lg font-bold text-white tracking-tight">Plan Your Journey</h2>
+               <h2 className="text-lg font-bold text-white tracking-tight font-['Space_Grotesk']">Plan Your Journey</h2>
              </div>
              
              <InputForm onSubmit={handleSubmit} />
@@ -72,11 +89,6 @@ const Home: React.FC = () => {
         </div>
 
         {/* Floating Background Illustration (Simplified) */}
-        <div className="mt-12 flex justify-center gap-8 opacity-40">
-           <Train className="text-white" size={32} />
-           <Bus className="text-white" size={32} />
-           <NavIcon className="text-white" size={32} />
-        </div>
       </div>
     </main>
   );

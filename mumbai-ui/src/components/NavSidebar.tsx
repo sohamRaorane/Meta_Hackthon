@@ -6,7 +6,8 @@ import {
   Navigation, 
   Map as MapIcon, 
   Smartphone,
-  Menu
+  Menu,
+  Train
 } from 'lucide-react';
 
 const NavSidebar: React.FC = () => {
@@ -28,9 +29,9 @@ const NavSidebar: React.FC = () => {
 
   return (
     <nav className="flex h-screen w-[72px] flex-col items-center border-r border-slate-200 bg-white py-4 shadow-sm z-50">
-      <button className="mb-6 flex h-10 w-10 items-center justify-center rounded-full hover:bg-slate-100">
-        <Menu size={24} className="text-slate-600" />
-      </button>
+      <div className="mb-6 flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 shadow-[0_0_15px_#2563eb]">
+        <Train size={24} className="text-white" />
+      </div>
 
       <div className="flex flex-col gap-2 w-full px-2">
         {items.map((item, i) => (

@@ -35,11 +35,12 @@ const RouteCard: React.FC<RouteCardProps> = ({ route, selected, best, onSelect }
   return (
     <button
       onClick={() => onSelect(route.id)}
+      style={{ borderLeftColor: `var(--${route.transport_type})` }}
       className={`relative w-full px-5 py-6 text-left transition-all border-l-[6px] ${
         selected 
-          ? 'bg-blue-50/60 border-blue-600 shadow-inner' 
-          : 'bg-white border-transparent hover:bg-slate-50'
-      }`}
+          ? 'bg-blue-50/60 shadow-inner' 
+          : 'bg-white hover:bg-slate-50'
+      } ${best ? 'shadow-[0_0_15px_#10b98133] border border-[#10b98155]' : 'border border-slate-100'}`}
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 space-y-1">

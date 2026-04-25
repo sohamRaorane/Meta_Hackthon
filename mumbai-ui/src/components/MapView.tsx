@@ -4,13 +4,18 @@ import { Icon, DivIcon } from 'leaflet';
 import { Search, Circle, Activity, Hotel, Layers, Maximize, Target, MoreVertical, Plus, Minus, CloudRain, Car, Clock } from 'lucide-react';
 import type { RouteData } from '../types/route';
 
-const markerIcon = new Icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
+const sourceIcon = new DivIcon({
+  html: `<div class="bg-emerald-500 rounded-full h-8 w-8 flex items-center justify-center shadow-[0_0_15px_#10b981] animate-pulse border-2 border-white"><span class="text-white font-bold text-sm">A</span></div>`,
+  className: 'custom-div-icon',
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+});
+
+const destIcon = new DivIcon({
+  html: `<div class="bg-amber-500 rounded-full h-8 w-8 flex items-center justify-center shadow-[0_0_15px_#f59e0b] animate-pulse border-2 border-white"><span class="text-white font-bold text-sm">B</span></div>`,
+  className: 'custom-div-icon',
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
 });
 
 // Create a custom div icon for the moving vehicle
@@ -25,10 +30,10 @@ const createVehicleIcon = (type: string) => {
   };
   
   return new DivIcon({
-    html: `<div class="bg-white p-2 rounded-full shadow-2xl border-4 border-blue-600 flex items-center justify-center text-4xl animate-bounce transform scale-125">${icons[type] || '🚗'}</div>`,
-    className: 'custom-div-icon',
-    iconSize: [80, 80],
-    iconAnchor: [40, 40],
+    html: `<div class="bg-white h-12 w-12 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.3)] border-4 border-blue-600 flex items-center justify-center text-4xl transform scale-125">${icons[type] || '🚗'}</div>`,
+    className: 'custom-div-icon transit-icon-animate',
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
   });
 };
 
@@ -159,10 +164,10 @@ const MapView: React.FC<MapViewProps> = ({ routes, selectedRouteId, onSelectRout
         
         <ZoomControl position="bottomright" />
 
-        <Marker position={source} icon={markerIcon}>
+        <Marker position={source} icon={sourceIcon}>
           <Popup>Start Point</Popup>
         </Marker>
-        <Marker position={destination} icon={markerIcon}>
+        <Marker position={destination} icon={destIcon}>
           <Popup>Destination</Popup>
         </Marker>
 
@@ -186,11 +191,12 @@ const MapView: React.FC<MapViewProps> = ({ routes, selectedRouteId, onSelectRout
               positions={route.coordinates}
               pathOptions={{
                 color: selected ? '#2563eb' : color,
-                weight: selected ? 8 : 4,
+                weight: selected ? 10 : 4,
                 opacity: selected ? 1 : hovered ? 0.8 : 0.4,
                 lineJoin: 'round',
                 lineCap: 'round',
-                dashArray: selected ? undefined : '10, 15',
+                dashArray: selected ? undefined : '6, 12',
+                className: selected ? 'route-glow' : undefined
               }}
               eventHandlers={{
                 click: () => onSelectRoute(route.id),
