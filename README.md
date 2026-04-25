@@ -114,11 +114,6 @@ export OPENAI_API_KEY=your-api-key-here
 python inference.py
 ```
 
-Optional local UI (separate terminal):
-```bash
-streamlit run app.py --server.port 8501 --server.address 0.0.0.0
-```
-
 ## Docker
 ```bash
 docker build -t mumbai-lastmile .
@@ -138,7 +133,6 @@ Container entrypoint serves FastAPI directly on port `7860` via `uvicorn server.
 ├── server/
 │   ├── app.py             # FastAPI server
 │   └── environment.py     # Core simulation engine
-├── app.py                 # Streamlit frontend UI
 ├── models.py              # Pydantic typed models
 ├── client.py              # Client wrapper
 ├── inference.py           # Baseline agent script
