@@ -1,9 +1,7 @@
-fastapi==0.115.6
-uvicorn[standard]==0.32.1
-pydantic==2.10.3
-openenv-core==0.1.4
-requests==2.32.3
-openai==1.58.1
-gradio==5.9.1
-httpx==0.28.1
-python-multipart==0.0.20
+fastapi
+uvicorn[standard]
+pydantic
+openenv-core
+requests
+streamlit
+openai

@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import json
-import os
 from typing import Optional, Dict, Any
 
 # Page config
@@ -84,7 +83,7 @@ task_info = {
     "easy": "🟢 EASY - Andheri East → Kurla (2 legs, clear weather, Rs120)",
     "medium": "🟡 MEDIUM - Borivali → CST (3 legs, heavy rain, Rs80)",
     "hard": "🔴 HARD - Churchgate → BKC (4 legs, cascading failures, Rs75)",
-    "bonus": "💎 BONUS - Bandra Station → Juhu Beach (2 legs, tight budget, Rs30)"
+    "bonus": "💎 BONUS - CST → Borivali (2 legs, tight budget, Rs30)"
 }
 
 st.sidebar.markdown(f"**{task_info.get(task_name, '')}**")
@@ -133,18 +132,8 @@ if reset_button:
 # Step episode
 if step_button and st.session_state.episode_id:
     try:
-        # Get the current observation to pass to the LLM
-        current_obs = st.session_state.episode_data["observation"]
-        echoed_msg = current_obs.get("echoed_message", "")
-        
-        # Import and call the ask_model function from inference
-        from inference import ask_model, OpenAI
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
-        decision = ask_model(client, echoed_msg)
-        
-        # Use the LLM's decision or fallback to bus
-        action = {"message": decision.get("reason", "Take bus")}
-        
+        # Simple action: always take bus
+        action = {"message": "Take bus"}
         resp = requests.post(
             f"{SERVER_URL}/step",
             json={"episode_id": st.session_state.episode_id, "action": action},

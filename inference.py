@@ -8,7 +8,7 @@
 import os
 import json
 import requests
-from typing import Optional
+from typing import List, Optional
 from openai import OpenAI
 from server.graders import grade_task
 
@@ -16,7 +16,7 @@ from server.graders import grade_task
 # API_BASE_URL = os.getenv("API_BASE_URL", "https://api.featherless.ai/v1")
 # MODEL_NAME   = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api.featherless.ai/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-1.5B-Instruct")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-7B-Instruct")
 HF_TOKEN = os.getenv("HF_TOKEN")
 API_KEY = HF_TOKEN or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", "")
 
@@ -27,7 +27,12 @@ BENCHMARK    = "mumbai-lastmile"
 # Based on reward function: per-leg rewards + destination + buffer + efficiency
 # Easy: 2 legs, max ~1.5 per step realistically
 # We use a fixed normalization ceiling
-
+MAX_REWARD_PER_TASK = {
+    "easy":   2.0,
+    "medium": 2.0,
+    "hard":   2.5,
+    "bonus":  2.0,
+}
 
 TASKS = ["easy", "medium", "hard", "bonus"]
 TASK_SEEDS = {"easy": 42, "medium": 7, "hard": 13, "bonus": 99}
@@ -59,30 +64,58 @@ def log_end(success: bool, steps: int,
 
 # ── System Prompt ────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are a Mumbai commuter agent. You must pick the best transport mode for each leg of your journey.
+SYSTEM_PROMPT = """You are an expert Mumbai commuter agent navigating a MULTI-LEG journey.
 
-You will be given:
-- Your current leg (e.g., Leg 1 of 2)
-- Time remaining (minutes)
-- Budget remaining (₹)
-- Weather condition (clear / light_rain / heavy_rain)
-- Known disruptions on routes
-- Available transport modes with their cost, estimated time, and reliability
+You will be given one leg at a time. Budget and time carry over between legs.
 
-Rules to keep in mind:
-- In heavy rain, auto-rickshaws are often unavailable or unsafe. Prefer metro or train.
-- If a mode is marked unavailable, do not choose it.
-- Stay within your budget.
-- Prefer faster modes if time is low.
-- Metro and train are more reliable in bad weather.
-- Walk is slow. Use only last resort.
+═══════════════════════════════════════════
+MULTI-LEG AWARENESS
+═══════════════════════════════════════════
+You will see: [Leg X of Y] at the top.
+- Leg 1 of 3: spend max 40% of budget here
+- Leg 2 of 3: keep at least ₹20 for final leg
+- Final leg: spend freely
 
-Respond with ONLY one JSON object on the last line:
+RAIN RULES:
+- heavy_rain → NEVER pick auto. Metro first choice.
+- heavy_rain → Bus 30-50% slower. Last resort only.
+- light_rain → Prefer metro/train over auto.
 
-{"mode":"metro","reason":"Fastest reliable option within budget"}
+DISRUPTION RULES:
+- "Harbour line delayed" → no train
+- "Western line signal failure" → no train, use metro
+- "signal failure" → treat train as unavailable
+- "bus diverted" or "bus suspended" → no bus
+- "auto strike" → no auto
+- Confidence below 0.5 → treat as unavailable
 
-mode must be exactly one of:
-metro / train / auto / bus / walk
+BUDGET RULES:
+- Never pick mode costing more than budget_remaining
+- Budget under ₹20 → only train or bus
+- Budget under ₹50 → no auto
+
+TIME RULES:
+- Under 15 min → fastest mode only
+- Under 25 min → no bus
+- Under 30 min with legs remaining → metro or train only
+
+PRIORITY: metro > train > auto > bus > walk
+
+WEIGHTED SCORING (apply mentally):
+  time_score   = 1.0 - (est_time_min / time_remaining)
+  cost_score   = 1.0 - (est_cost / budget_remaining)
+  reliability  = confidence * availability
+  total = (time_score*0.4) + (cost_score*0.3) + (reliability*0.3)
+  Penalize -0.5 for auto in rain.
+
+MID-JOURNEY REPLAN:
+- If event says "Re-plan now": cancel previous plan, pick fresh.
+
+OUTPUT FORMAT — ONLY THIS JSON, NOTHING ELSE:
+{"mode": "metro", "reason": "Leg 1 of 2: metro scores highest — 20min, ₹40, confidence 1.0, weather-proof."}
+
+mode must be exactly one of: metro / train / auto / bus / walk
+No markdown. No backticks. No extra text.
 """
 
 # ── Server calls ─────────────────────────────────────────────────
@@ -108,93 +141,42 @@ def call_step(episode_id: str, message: str) -> dict:
 
 # ── Model call ───────────────────────────────────────────────────
 
-def choose_fallback_mode(situation: str) -> str:
-    """Heuristic fallback so we do not always collapse to one fixed mode."""
-    text = (situation or "").lower()
-
-    if "heavy_rain" in text:
-        preferred = ["metro", "train", "bus", "walk"]
-    elif "light_rain" in text:
-        preferred = ["metro", "bus", "train", "auto", "walk"]
-    else:
-        preferred = ["metro", "train", "auto", "bus", "walk"]
-
-    for mode in preferred:
-        unavailable_markers = [
-            f"{mode}: unavailable",
-            f"{mode} unavailable",
-            f"{mode} - unavailable",
-        ]
-        if any(marker in text for marker in unavailable_markers):
-            continue
-        return mode
-
-    return "walk"
-
 def ask_model(client: OpenAI, situation: str, mid_event: str = None) -> dict:
-    prompt = situation + "\n\nReturn ONLY a JSON object like {\"mode\":\"metro\",\"reason\":\"brief\"}"
+    prompt = situation
     if mid_event:
-        if mid_event:
-            prompt = f"MID-JOURNEY EVENT — RE-PLAN:\n{mid_event}\n\n{situation}\n\nReturn ONLY a JSON object like {{\"mode\":\"metro\",\"reason\":\"brief\"}}"
+        prompt = f"MID-JOURNEY EVENT — RE-PLAN:\n{mid_event}\n\n{situation}"
 
-    # Retry logic with exponential backoff: 1s, 2s, 4s
-    import time
-    max_attempts = 3
-    backoff_seconds = [1, 2, 4]
-    
-    for attempt in range(max_attempts):
-        try:
-            response = client.chat.completions.create(
-                model=MODEL_NAME,
-                max_tokens=80,
-                temperature=0.1,
-                response_format={"type": "json_object"},
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user",   "content": prompt},
-                ],
-            )
-            raw = response.choices[0].message.content.strip()
-        except Exception as e:
-            if attempt < max_attempts - 1:
-                wait_time = backoff_seconds[attempt]
-                time.sleep(wait_time)
-                continue
-            else:
-                mode = choose_fallback_mode(situation)
-                return {
-                    "mode": mode,
-                    "reason": f"fallback({mode}) after API error: {str(e)[:60]}",
-                }
+    try:
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            max_tokens=150,
+            temperature=0.1,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user",   "content": prompt},
+            ],
+        )
+        raw = response.choices[0].message.content.strip()
+    except Exception as e:
+        return {"mode": "bus", "reason": f"API error: {str(e)[:50]}"}
 
-        # Strip markdown fences
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-            raw = raw.strip()
+    # Strip markdown fences
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
 
-        try:
-            decision = json.loads(raw)
-            if decision.get("mode") not in ["metro","train","auto","bus","walk"]:
-                raise ValueError("invalid mode")
-            return decision
-        except (json.JSONDecodeError, ValueError):
-            raw_lower = raw.lower()
-
-            for mode in ["metro","train","auto","bus","walk"]:
-                if f'"mode":"{mode}"' in raw_lower or f'"mode": "{mode}"' in raw_lower:
-                 return {"mode": mode, "reason": "parsed json fragment"}
-
-            for mode in ["metro","train","auto","bus","walk"]:
-                if raw_lower.strip() == mode:
-                 return {"mode": mode, "reason": "single word"}
-
-            mode = choose_fallback_mode(situation)
-            return {"mode": mode, "reason": f"fallback({mode}) parse"}
-    
-    # Should not reach here
-    return {"mode": "bus", "reason": "max_attempts exhausted"}
+    try:
+        decision = json.loads(raw)
+        if decision.get("mode") not in ["metro","train","auto","bus","walk"]:
+            raise ValueError("invalid mode")
+        return decision
+    except (json.JSONDecodeError, ValueError):
+        for mode in ["metro","train","bus","auto","walk"]:
+            if mode in raw.lower():
+                return {"mode": mode, "reason": f"parsed from: {raw[:60]}"}
+        return {"mode": "bus", "reason": "fallback"}
 
 # ── Task runner ──────────────────────────────────────────────────
 
@@ -247,8 +229,8 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
             if obs.get("mid_journey_update"):
                 pending_event = obs["mid_journey_update"]
 
-        # Check success: reached final destination
-        success = bool(final_obs.get("reached", False))
+        # Check success: reached destination
+        success = obs["current_location"] == obs["destination"]
 
     except Exception as e:
         error_msg = str(e)[:80]
@@ -256,31 +238,30 @@ def run_task(task_name: str, seed: int, client: OpenAI) -> dict:
 
     # Normalize total reward to [0, 1]
     total_reward = sum(rewards)
+    max_reward   = MAX_REWARD_PER_TASK.get(task_name, 2.0)
+    raw_score = total_reward / max_reward
+    score = round(min(max(raw_score, 0.001), 0.999), 3)
     grader_score = grade_task(task_name, final_obs, rewards, steps_taken)
 
     log_end(
         success=success,
         steps=steps_taken,
-        score=grader_score,        # ← grader_score, not raw_score
+        score=score,
         rewards=rewards,
     )
 
     return {
-        "task_name":  task_name,
-        "score":      grader_score,
-        "steps":      steps_taken,
-        "success":    success,
-        "rewards":    rewards,
+        "task_name": task_name,
+        "score":     score,
+        "steps":     steps_taken,
+        "success":   success,
+        "rewards":   rewards,
+        "grader_score": grader_score,
     }
 
 # ── Main ─────────────────────────────────────────────────────────
 
 def main():
-    if not API_KEY:
-        raise RuntimeError(
-            "No API key found. Set HF_TOKEN or OPENAI_API_KEY or API_KEY before running inference.py"
-        )
-
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
 
     for task_name in TASKS:

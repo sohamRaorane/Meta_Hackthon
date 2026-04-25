@@ -28,7 +28,6 @@ class MumbaiObservation(Observation):
     known_disruptions: List[str]
     mid_journey_update: Optional[str] = None
     timestep: int
-    reached: bool = False
 
 
 class MumbaiState(State):

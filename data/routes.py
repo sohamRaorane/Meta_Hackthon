@@ -61,17 +61,6 @@ CORRIDORS = {
         "metro": {"cost": 40,  "time_min": 22, "time_max": 28, "availability": 0.90},
         "walk":  {"cost": 0,   "time_min": 90, "time_max": 110,"availability": 1.00},
     },
-
-    "Dadar_to_CST": {
-        # Central line southbound — Dadar to CST is ~4 stops, 12-18 min
-        # This is a real commuter route used by thousands daily
-        "train": {"cost": 10,  "time_min": 12, "time_max": 18, "availability": 0.82},
-        "bus":   {"cost": 10,  "time_min": 20, "time_max": 35, "availability": 0.78},
-        "auto":  {"cost": 80,  "time_min": 15, "time_max": 28, "availability": 0.68},
-        "metro": {"cost": 25,  "time_min": 14, "time_max": 20, "availability": 0.88},
-        "walk":  {"cost": 0,   "time_min": 45, "time_max": 55, "availability": 1.00},
-    },
-
     "Dadar_to_Bandra": {
         "train": {"cost": 10,  "time_min": 12, "time_max": 18, "availability": 0.85},
         "bus":   {"cost": 10,  "time_min": 20, "time_max": 35, "availability": 0.82},
@@ -167,7 +156,6 @@ WEATHER_MODIFIERS = {
         "bus_time_factor":    1.3,
         "train_availability": 0.85,
         "metro_availability": 0.95,
-        "walk_availability":  0.55,
     },
 }
 
@@ -267,7 +255,7 @@ TASKS = {
             {
                 "from_location": "Dadar",
                 "to_location":   "CST",
-                "corridor_key":  "Dadar_to_CST",
+                "corridor_key":  "CST_to_Kurla",
                 "description":   "Second leg: Dadar to CST via Central line (southbound)",
             },
             {
@@ -331,17 +319,3 @@ TASKS = {
         "max_steps":                 4,
     },
 }
-
-# ── DISRUPTION POOL ──────────────────────────────────────────────
-# Dynamic disruptions that can be injected during episodes.
-# Paper 2408.10215: environment should have realistic stochasticity
-DISRUPTION_POOL = [
-    "Signal failure reported — train services suspended on this corridor.",
-    "Auto strike in progress — no autos available anywhere.",
-    "Flash flooding — bus routes diverted, 20 min delays.",
-    "Metro overcrowding — 15 min queue at current station.",
-    "Police checkpoint — road traffic at standstill.",
-    "Power outage — metro suspended until further notice.",
-    "Sudden heavy rain — all road-based transport slowing down.",
-    "Procession blocking main road — bus cannot proceed.",
-]
