@@ -21,6 +21,23 @@ app = FastAPI()
 def root():
     return RedirectResponse(url="/docs")
 
+
+def task_catalog():
+    return {
+        "easy": {
+            "description": "Simple single-leg journey with minimal disruptions"
+        },
+        "medium": {
+            "description": "Multi-leg journey with moderate disruptions"
+        },
+        "hard": {
+            "description": "Complex journey with dynamic failures"
+        },
+        "bonus": {
+            "description": "Edge-case scenario with extreme conditions"
+        }
+    }
+
 # Global store: episode_id → environment instance
 # This is the correct way to manage state across requests
 ENV_STORE: dict = {}
@@ -151,6 +168,15 @@ def schema():
             "description": "See /state response payload fields",
         },
     }
+
+@app.get("/task")
+def task():
+    return task_catalog()
+
+
+@app.get("/tasks")
+def get_tasks():
+    return task_catalog()
 
 
 @app.post("/mcp")
