@@ -173,7 +173,7 @@ WEATHER_MODIFIERS = {
 
 TASKS = {
 
-    # ── EASY: 2-leg, clear weather, generous budget/time ─────────
+     # ── EASY: 2-leg, clear weather — budget TIGHTENED to force real decisions ─
     "easy": {
         "origin":      "Andheri East",
         "destination": "Kurla Station",
@@ -191,19 +191,21 @@ TASKS = {
                 "description":   "Final leg: Ghatkopar to Kurla Station",
             },
         ],
-        "time_limit":  60,
-        "budget":      120.0,
+        "time_limit":  45,          # was 60 — now tighter
+        "budget":      55.0,        # was 120 — now just enough for train+metro
         "seed":        42,
-        "weather":     "clear",
-        "disruptions": ["Harbour line delayed 20 min"],
-        # sensor_reliability per mode [train, auto, bus, metro, walk]
-        "sensor_reliability":        [0.9, 1.0, 1.0, 1.0, 1.0],
+        "weather":     "light_rain", # was clear — now requires mode awareness
+        "disruptions": [
+            "Harbour line delayed 20 min — avoid train on this corridor",
+            "Light rain affecting auto availability",
+        ],
+        "sensor_reliability":        [0.7, 0.6, 0.9, 1.0, 1.0],
         "mid_journey_inject_step":   None,
         "mid_journey_event":         None,
         "max_steps":                 4,
     },
 
-    # ── MEDIUM: 2-leg, heavy rain, tighter budget ────────────────
+    # ── MEDIUM: 3-leg, heavy rain, tight budget — forces multi-step planning ──
     "medium": {
         "origin":      "Borivali Station",
         "destination": "CST",
@@ -227,16 +229,17 @@ TASKS = {
                 "description":   "Final leg: Ghatkopar to CST",
             },
         ],
-        "time_limit":  90,
-        "budget":      80.0,
+        "time_limit":  75,          # was 90 — tighter
+        "budget":      60.0,        # was 80 — forces real budget tradeoffs
         "seed":        7,
         "weather":     "heavy_rain",
         "disruptions": [
-            "Heavy rain — auto availability very low",
+            "Heavy rain — auto availability critically low",
             "Western line slow — signal issues reported",
+            "Bus service unreliable — 50% chance of no-show",
         ],
-        "sensor_reliability":        [0.6, 0.3, 0.7, 1.0, 1.0],
-        "mid_journey_inject_step":   2,
+        "sensor_reliability":        [0.5, 0.2, 0.6, 1.0, 1.0],
+        "mid_journey_inject_step":   1,    # fires after step 1 (earlier surprise)
         "mid_journey_event":         "Bus service suspended on Andheri-Ghatkopar route. Re-plan now.",
         "max_steps":                 5,
     },

@@ -67,6 +67,7 @@ def obs_to_dict(obs, reward=None, done=False):
             "time_remaining_minutes":  obs.time_remaining_minutes,
             "budget_remaining":        obs.budget_remaining,
             "weather":                 obs.weather,
+            "reached":                 getattr(obs, 'reached', False),
             "available_modes": [
                 {
                     "mode":         m.mode,

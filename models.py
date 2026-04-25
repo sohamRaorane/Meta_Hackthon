@@ -28,6 +28,7 @@ class MumbaiObservation(Observation):
     known_disruptions: List[str]
     mid_journey_update: Optional[str] = None
     timestep: int
+    reached: bool = False
 
 
 class MumbaiState(State):
@@ -35,3 +36,4 @@ class MumbaiState(State):
     origin: str = ""
     destination: str = ""
     seed: int = 42
+    episode_id: str = ""

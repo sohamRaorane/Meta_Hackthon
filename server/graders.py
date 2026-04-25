@@ -14,7 +14,10 @@ def _clamp01(value: float) -> float:
 
 
 def _base_grade(final_observation: dict[str, Any], rewards: list[float], steps_taken: int) -> float:
-    reached = final_observation.get("current_location") == final_observation.get("destination")
+    reached = (
+    final_observation.get("reached", False) or
+    final_observation.get("current_location") == final_observation.get("destination")
+)
     time_left = max(0.0, float(final_observation.get("time_remaining_minutes", 0)))
     budget_left = float(final_observation.get("budget_remaining", 0.0))
 

@@ -88,6 +88,7 @@ class MumbaiLastMileEnvironment(Environment):
             known_disruptions=self._disruptions,
             mid_journey_update=None,
             timestep=self._timestep,
+            reached=False,
         )
 
     def step(
@@ -156,6 +157,7 @@ class MumbaiLastMileEnvironment(Environment):
             known_disruptions=self._disruptions,
             mid_journey_update=mid_update,
             timestep=self._timestep,
+            reached=self._reached, 
         )
 
     @property
