@@ -1,6 +1,6 @@
 {
   "phase": "post_training",
-  "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
+  "model_name": "eagle25/mumbai-grpo-agent",
   "environment": "mumbai-lastmile",
   "timestamp": "2025-04-26T00:00:00",
   "tasks": [

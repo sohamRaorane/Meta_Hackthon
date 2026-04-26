@@ -1,0 +1,25 @@
+[START] task=easy env=mumbai-lastmile model=Qwen/Qwen2.5-1.5B-Instruct
+  [CONFIG] Missing API key (HF_TOKEN/OPENAI_API_KEY/API_KEY). Using local fallback.
+[STEP] step=1 action=Take bus reward=0.47 done=false error=null
+[STEP] step=2 action=Take bus reward=1.25 done=true error=null
+[END] success=true steps=2 score=0.786 rewards=0.47,1.25
+[START] task=medium env=mumbai-lastmile model=Qwen/Qwen2.5-1.5B-Instruct
+[STEP] step=1 action=Take train reward=0.41 done=false error=null
+  [FAILED] train gave negative reward, excluding from next attempt
+[STEP] step=2 action=Take train reward=-0.17 done=false error=null
+  [FAILED] bus gave negative reward, excluding from next attempt
+[STEP] step=3 action=Take bus reward=-0.12 done=true error=null
+[END] success=false steps=3 score=0.027 rewards=0.41,-0.17,-0.12
+[START] task=hard env=mumbai-lastmile model=Qwen/Qwen2.5-1.5B-Instruct
+[STEP] step=1 action=Take bus reward=0.38 done=false error=null
+  [FAILED] bus gave negative reward, excluding from next attempt
+[STEP] step=2 action=Take bus reward=-0.17 done=false error=null
+  [FAILED] train gave negative reward, excluding from next attempt
+[STEP] step=3 action=Take train reward=-0.17 done=false error=null
+  [FAILED] metro gave negative reward, excluding from next attempt
+[STEP] step=4 action=Take metro reward=-0.21 done=true error=null
+[END] success=false steps=4 score=0.008 rewards=0.38,-0.17,-0.17,-0.21
+[START] task=bonus env=mumbai-lastmile model=Qwen/Qwen2.5-1.5B-Instruct
+[STEP] step=1 action=Take train reward=0.45 done=false error=null
+[STEP] step=2 action=Take train reward=1.32 done=true error=null
+[END] success=true steps=2 score=0.759 rewards=0.45,1.32

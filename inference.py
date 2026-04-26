@@ -1,6 +1,6 @@
-# inference.py
 import os
 import json
+import re
 import requests
 from openai import OpenAI
 from server.graders import grade_task
@@ -11,15 +11,20 @@ HF_TOKEN     = os.getenv("HF_TOKEN")
 API_KEY      = HF_TOKEN or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY", "")
 SERVER_URL   = os.getenv("SERVER_URL", "http://localhost:8000")
 BENCHMARK    = "mumbai-lastmile"
+API_DISABLED_REASON = None
 
 MAX_REWARD_PER_TASK = {"easy": 2.0, "medium": 2.0, "hard": 2.5, "bonus": 2.0}
 TASKS      = ["easy", "medium", "hard", "bonus"]
 TASK_SEEDS = {"easy": 42, "medium": 7, "hard": 13, "bonus": 99}
 
-# ── Stripped prompt — Qwen 1.5B can actually follow this ─────────
-SYSTEM_PROMPT = """You are a Mumbai commute agent. 
+# Minimum cost per leg for each task (train is always cheapest at ₹10-15)
+# Used to estimate how much budget must be reserved for future legs
+MIN_LEG_COST = 10  # train is ₹10 on almost every corridor
+
+SYSTEM_PROMPT = """You are a Mumbai commute agent.
 You will be given available transport options with times and costs.
-Pick the best option from the list provided.
+Your budget must last ALL remaining legs of the journey.
+Pick the best affordable option from the list provided.
 Respond ONLY with JSON: {"mode": "chosen_mode", "reason": "brief reason"}
 mode must be exactly one of: metro, train, auto, bus, walk"""
 
@@ -46,8 +51,6 @@ def call_step(episode_id, message):
     return r.json()
 
 
-import re
-
 def parse_available_modes(situation_text: str) -> dict:
     modes_found = {}
     lines = situation_text.split("\n")
@@ -62,42 +65,37 @@ def parse_available_modes(situation_text: str) -> dict:
             "line delayed",
         ]
     )
-    
+
     for line in lines:
         stripped = line.strip().lower()
-        
+
         for mode in ["metro", "train", "auto", "bus", "walk"]:
-            # Match any of these formats:
-            # "  train: available — 15 min, ₹10"
-            # "- train: 15 min, ₹10, confidence 0.9"
-            # "train (available): ..."
-            # "train: NOT available"
-            if not (stripped.startswith(mode + ":") or 
+            if not (stripped.startswith(mode + ":") or
                     stripped.startswith("- " + mode + ":") or
                     stripped.startswith("* " + mode + ":")):
                 continue
-            
+
             is_available = (
                 "not available" not in stripped and
                 "unavailable"   not in stripped and
                 "no service"    not in stripped and
                 "suspended"     not in stripped
             )
-            
+
             cost_match = re.search(r'₹(\d+)', line)
             time_match = re.search(r'(\d+)\s*min', line)
             conf_match = re.search(r'confidence\s*([\d.]+)', line, re.IGNORECASE)
             confidence = float(conf_match.group(1)) if conf_match else 1.0
             if mode == "train" and signal_failure:
                 confidence = min(confidence, 0.3)
-            
+
             modes_found[mode] = {
                 "available": is_available,
                 "cost":      int(cost_match.group(1))   if cost_match else 999,
                 "time":      int(time_match.group(1))   if time_match else 999,
                 "confidence": confidence,
             }
-    
+
     return modes_found
 
 
@@ -110,24 +108,38 @@ def build_clean_prompt(situation_text: str, available_modes: dict) -> str:
     budget   = int(budget_match.group(1))  if budget_match  else 999
     time_rem = int(time_match.group(1))    if time_match    else 999
     weather  = weather_match.group(1)      if weather_match else "clear"
-    leg_info = f"Leg {leg_match.group(1)} of {leg_match.group(2)}" if leg_match else "Journey"
+    leg_num  = int(leg_match.group(1))     if leg_match     else 1
+    leg_total = int(leg_match.group(2))    if leg_match     else 1
+    leg_info = f"Leg {leg_num} of {leg_total}" if leg_match else "Journey"
 
-    # Filter to only affordable available modes
+    # Calculate minimum budget needed for FUTURE legs (reserve for them)
+    future_legs = leg_total - leg_num  # legs after this one
+    min_future_reserve = future_legs * MIN_LEG_COST
+    effective_budget = budget - min_future_reserve  # what we can spend NOW
+
+    # Filter: only modes that are available AND affordable NOW (respecting future reserve)
     viable = {
         m: i for m, i in available_modes.items()
-        if i["available"] and i["cost"] <= budget
+        if i["available"] and i["cost"] <= max(effective_budget, 0)
     }
 
+    # If nothing viable with reserve, fall back to modes affordable within full budget
+    if not viable:
+        viable = {
+            m: i for m, i in available_modes.items()
+            if i["available"] and i["cost"] <= budget
+        }
+
+    # Last resort
     if not viable:
         viable = {"walk": {"cost": 0, "time": 999, "confidence": 1.0}}
 
-    # Prefer modes that are both fast and reliable.
+    # Sort by time / confidence (fastest reliable option first)
     sorted_modes = sorted(
         viable.items(),
         key=lambda x: x[1]["time"] / max(x[1].get("confidence", 1.0), 0.1),
     )
 
-    # Build numbered list with BEST label on #1
     options_lines = []
     for idx, (mode, info) in enumerate(sorted_modes):
         label = " ← BEST CHOICE" if idx == 0 else ""
@@ -142,6 +154,8 @@ def build_clean_prompt(situation_text: str, available_modes: dict) -> str:
     warnings = []
     if "heavy" in weather:
         warnings.append("Heavy rain: do not pick auto.")
+    if future_legs > 0:
+        warnings.append(f"You have {future_legs} more leg(s) after this. Budget reserve: ₹{min_future_reserve} kept.")
     if time_rem < 20:
         warnings.append(f"Only {time_rem} min left: pick option 1 immediately.")
     elif time_rem < best_time + 5:
@@ -149,9 +163,9 @@ def build_clean_prompt(situation_text: str, available_modes: dict) -> str:
 
     warning_str = "\n".join(warnings)
 
-    prompt = f"""{leg_info} | Weather: {weather} | Time left: {time_rem} min | Budget: ₹{budget}
+    prompt = f"""{leg_info} | Weather: {weather} | Time left: {time_rem} min | Budget left: ₹{budget} (can spend ₹{effective_budget} now)
 
-OPTIONS (sorted fastest first):
+OPTIONS (sorted fastest first, all within affordable range):
 {options_str}
 
 {warning_str}
@@ -162,7 +176,36 @@ Reply ONLY with JSON: {{"mode": "{best_mode}", "reason": "one line reason"}}"""
     return prompt
 
 
+def pick_fallback_mode(available_modes: dict, situation_text: str = "") -> str:
+    candidates = [
+        (mode, info) for mode, info in available_modes.items()
+        if info.get("available", False)
+    ]
+    if not candidates:
+        return "bus"
+
+    weather_heavy = "heavy" in situation_text.lower()
+    non_walk = [(m, i) for (m, i) in candidates if m != "walk"]
+    pool = non_walk if non_walk else candidates
+
+    # Prefer affordable, reliable, practical transport in fallback mode.
+    # Avoid auto in heavy rain unless there is no better option.
+    def rank(item):
+        mode, info = item
+        rain_penalty = 1000 if (weather_heavy and mode == "auto") else 0
+        return (
+            rain_penalty,
+            info.get("cost", 999),
+            info.get("time", 999) / max(info.get("confidence", 1.0), 0.1),
+        )
+
+    best_mode, _ = min(pool, key=rank)
+    return best_mode
+
+
 def ask_model(client, situation, mid_event=None, failed_modes=None):
+    global API_DISABLED_REASON
+
     if failed_modes is None:
         failed_modes = []
 
@@ -171,9 +214,7 @@ def ask_model(client, situation, mid_event=None, failed_modes=None):
     for mode in failed_modes:
         if mode in available_modes:
             available_modes[mode]["available"] = False
-    
-    
-    # Build prompt — always assign before use
+
     if available_modes:
         prompt = build_clean_prompt(situation, available_modes)
     else:
@@ -181,13 +222,19 @@ def ask_model(client, situation, mid_event=None, failed_modes=None):
 
     if failed_modes:
         prompt += f"\n\nDO NOT retry: {', '.join(failed_modes)} - already failed this leg."
-    
-  
-    
+
     if mid_event:
         prompt = f"MID-JOURNEY ALERT: {mid_event}\n\n" + prompt
-    
-    # rest of function continues...
+
+    if API_DISABLED_REASON is not None:
+        fallback_mode = pick_fallback_mode(available_modes, situation)
+        return {"mode": fallback_mode, "reason": API_DISABLED_REASON}
+
+    if not API_KEY:
+        API_DISABLED_REASON = "missing API credentials fallback"
+        print("  [CONFIG] Missing API key (HF_TOKEN/OPENAI_API_KEY/API_KEY). Using local fallback.", flush=True)
+        fallback_mode = pick_fallback_mode(available_modes, situation)
+        return {"mode": fallback_mode, "reason": API_DISABLED_REASON}
 
     try:
         response = client.chat.completions.create(
@@ -200,18 +247,22 @@ def ask_model(client, situation, mid_event=None, failed_modes=None):
             ],
         )
         raw = response.choices[0].message.content.strip()
+        if os.getenv("DEBUG_MODEL_RAW") == "1":
+            print(f"  [RAW] {raw}", flush=True)
     except Exception as e:
         print(f"  [API ERROR] {type(e).__name__}: {str(e)[:120]}", flush=True)
-        # Pick cheapest available mode as fallback
-        cheapest = min(
-            [(m, i) for m, i in available_modes.items() if i["available"]],
-            key=lambda x: x[1]["cost"],
-            default=(None, None)
-        )
-        fallback_mode = cheapest[0] if cheapest[0] else "bus"
+        if "AuthenticationError" in type(e).__name__ or "401" in str(e):
+            API_DISABLED_REASON = "API authentication failed fallback"
+            print("  [CONFIG] Disabling remote LLM calls after auth failure; using local fallback.", flush=True)
+        if "NotFoundError" in type(e).__name__ or "404" in str(e):
+            API_DISABLED_REASON = "model not found fallback"
+            print(
+                "  [CONFIG] Disabling remote LLM calls after model-not-found error; using local fallback.",
+                flush=True,
+            )
+        fallback_mode = pick_fallback_mode(available_modes, situation)
         return {"mode": fallback_mode, "reason": "API error fallback"}
 
-    # Strip markdown fences
     if "```" in raw:
         parts = raw.split("```")
         raw = parts[1] if len(parts) > 1 else parts[0]
@@ -224,33 +275,30 @@ def ask_model(client, situation, mid_event=None, failed_modes=None):
         mode = decision.get("mode", "").lower().strip()
         if mode not in ["metro", "train", "auto", "bus", "walk"]:
             raise ValueError(f"invalid mode: {mode}")
-        
-        # Validate against parsed availability — hard block if mode not available
+
         if available_modes and mode in available_modes and not available_modes[mode]["available"]:
-            # Find best available alternative
             available = {m: i for m, i in available_modes.items() if i["available"] and i["cost"] <= 999}
             if available:
                 best = min(available.items(), key=lambda x: x[1]["time"])
                 print(f"  [BLOCK] {mode} not available → using {best[0]}", flush=True)
                 decision["mode"] = best[0]
                 decision["reason"] = f"switched from unavailable {mode}"
-        
+
         return decision
 
     except (json.JSONDecodeError, ValueError):
-        # Word scan fallback — prefer available modes
         for mode in ["metro", "train", "auto", "bus", "walk"]:
             if mode in raw.lower():
                 if not available_modes or available_modes.get(mode, {}).get("available", True):
                     return {"mode": mode, "reason": "parsed from raw"}
         print(f"  [PARSE FAIL] raw: {raw[:100]}", flush=True)
-        # Pick fastest available
         if available_modes:
             available = {m: i for m, i in available_modes.items() if i["available"]}
             if available:
                 best = min(available.items(), key=lambda x: x[1]["time"])
                 return {"mode": best[0], "reason": "parse fallback — fastest available"}
         return {"mode": "bus", "reason": "hard fallback"}
+
 
 def run_task(task_name, seed, client):
     log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
@@ -310,10 +358,8 @@ def run_task(task_name, seed, client):
         error_msg = str(e)[:80]
         log_step(step=steps_taken+1, action="error", reward=0.0, done=True, error=error_msg)
 
-    total_reward = sum(rewards)
-    max_reward   = MAX_REWARD_PER_TASK.get(task_name, 2.0)
-    score = round(min(max(total_reward / max_reward, 0.001), 0.999), 3)
     grader_score = grade_task(task_name, final_obs, rewards, steps_taken)
+    score = round(grader_score, 3)
 
     log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
     return {"task_name": task_name, "score": score, "steps": steps_taken,
