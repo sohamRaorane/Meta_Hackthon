@@ -1,142 +1,191 @@
----
-title: Mumbai Last-Mile Crisis Response
-emoji: 🚇
-colorFrom: blue
-colorTo: red
-sdk: docker
-pinned: false
-tags:
-  - openenv
-  - reinforcement-learning
-  - transport
----
+# Mumbai Last-Mile Crisis Response
+### OpenEnv Hackathon Submission | Reinforcement Learning Environment for Real-World Urban Routing
 
+Mumbai’s daily commute is one of the most complex transport systems in the world. A route that works at 8:30 AM can fail at 8:45 AM because of rain, signal failure, traffic congestion, crowding, or local disruptions.
+
+We built an **OpenEnv-compatible reinforcement learning environment** where an AI agent learns how to make better travel decisions under these changing conditions. Instead of solving toy games, the agent must solve a real planning problem: **Reach the destination on time, within budget, despite disruptions.**
 
 ---
-title: Mumbai Last-Mile Crisis Response
-emoji: 🚇
-colorFrom: blue
-colorTo: red
-sdk: docker
-pinned: false
-tags:
-  - openenv
-  - environment
-  - reinforcement-learning
-  - mumbai
-  - transport
+
+# Live Links
+
+| Resource | URL |
+| :--- | :--- |
+| **Hugging Face Space** | https://huggingface.co/spaces/eagle25/mumbai-lastmile-env |
+| **Live API** | https://eagle25-mumbai-lastmile-env.hf.space |
+| **API Docs** | https://eagle25-mumbai-lastmile-env.hf.space/docs |
+| **Full Writeup** | See `Blog.md` |
+
 ---
 
-# Mumbai Last-Mile Crisis Response Environment
+# Why This Environment Matters
 
-An OpenEnv environment where an AI agent must navigate multi-leg Mumbai 
-commutes under real-world constraints: weather disruptions, signal failures, 
-budget limits, and mid-journey surprises.
+Many language models can answer questions, but struggle with:
 
-## Motivation
+* **Multi-step planning**
+* **Dynamic decision making**
+* **Adapting to uncertainty**
+* **Balancing cost vs speed**
+* **Recovering from bad early choices**
 
-Mumbai's last-mile transport problem is one of the most complex real-world 
-routing challenges. Every commuter faces dynamic decisions — rain kills auto 
-availability, Western line failures cascade into missed connections, budget 
-constraints force trade-offs between speed and cost. This environment models 
-that complexity faithfully.
+Mumbai commuting naturally contains all of these challenges, making it a strong real-world RL benchmark.
 
-## Action Space
+---
 
-Text message describing the chosen transport mode:
-- Input: natural language string, e.g. `"Take metro. Fast and weather-proof."`
-- Parser extracts mode keyword: `metro / train / auto / bus / walk`
+# Environment Design
 
-## Observation Space
+The agent is given scenarios such as:
+* Andheri East to Kurla Station
+* Multi-leg transfer journeys
+* Tight budget trips
+* Time-critical office commutes
+* Weather-disrupted routes
 
-| Field | Type | Description |
-|-------|------|-------------|
-| echoed_message | str | Full situation text with leg context |
-| current_location | str | Agent's current waypoint |
-| destination | str | Final destination |
-| time_remaining_minutes | int | Minutes left to reach destination |
-| budget_remaining | float | Rupees remaining |
-| weather | str | clear / light_rain / heavy_rain |
-| available_modes | List[ModeInfo] | Per-mode cost, time, availability, confidence |
-| known_disruptions | List[str] | Active disruptions the agent knows about |
-| mid_journey_update | str | Surprise event requiring replanning (or null) |
-| timestep | int | Current step number |
+### Observations
+At each step, the agent observes:
+* Current location and destination
+* Time and budget remaining
+* Weather and known disruptions
+* Available transport modes (with estimated times/costs)
 
-## Tasks
+### Action Space
+The agent chooses one action:
+* **Train**
+* **Metro**
+* **Bus**
+* **Auto**
+* **Walk**
 
-| Task | Route | Legs | Time | Budget | Weather | Difficulty |
-|------|-------|------|------|--------|---------|------------|
-| easy | Andheri East → Kurla | 2 | 60min | ₹120 | clear | Baseline |
-| medium | Borivali → CST | 3 | 90min | ₹80 | heavy_rain | Mid-journey event |
-| hard | Churchgate → BKC | 4 | 85min | ₹75 | heavy_rain | Cascading failures |
-| bonus | Bandra → Juhu | 2 | 40min | ₹30 | light_rain | Budget crisis |
+---
 
-Programmatic deterministic graders are implemented in `server/graders.py` for all tasks
-(`easy`, `medium`, `hard`, `bonus`) and return scores in `[0.0, 1.0]`.
+# Core Logic
 
-## Reward Function
+The environment simulates real trade-offs:
+* **Metro:** Fast but may cost more.
+* **Bus:** Cheap but slower.
+* **Auto:** May become unreliable in rain.
+* **Walking:** Saves money but costs time.
+* **Cascading Effects:** A bad first leg can ruin the full journey.
 
-- `+0.15` per successful mode (mode was available)
-- `+0.4 / total_legs` per completed leg (partial progress)
-- `+0.8` for reaching final destination
-- `+0 to +0.30` time buffer bonus
-- `+0 to +0.15` budget efficiency bonus
-- `-0.25` auto chosen in heavy rain
-- `-0.30` mode was unavailable (agent picked wrong)
-- `-0.50` ran out of time
-- `-0.40` went over budget
-- Score normalized to `[0.0, 1.0]` per task
+This creates meaningful sequential planning instead of one-step guessing.
 
-## Baseline Scores
+---
 
-| Task | Score | Steps |
-|------|-------|-------|
-| easy | 0.92 | 2 |
-| medium | 0.53 | 3 |
-| hard | 0.07 | 2 |
-| bonus | 0.60 | 2 |
+# Reward Design
 
-## Setup
-```bash
-# Install dependencies
+The reward system is shaped to teach useful behavior.
+
+| Positive Reward For | Negative Reward For |
+| :--- | :--- |
+| Reaching destination | Wasting time |
+| Saving time | Overspending |
+| Staying within budget | Poor choices during disruptions |
+| Making progress each step | Failing to complete trip |
+
+---
+
+# OpenEnv Compatibility
+
+This project follows OpenEnv style APIs:
+* `reset()`
+* `step()`
+* Environment state transitions
+* Task-based episodes
+* Hosted public environment
+
+---
+
+# Training Pipeline
+
+We trained the agent using a **GRPO-based RL pipeline** with lightweight models for rapid iteration.
+
+1. **Phase 1:** Easy scenarios
+2. **Phase 2:** Medium scenarios
+3. **Phase 3:** Hard disruption-heavy scenarios
+
+The model repeatedly interacts with the environment, receives reward feedback, and improves behavior over time.
+
+---
+
+# Results
+
+### Success Rate Improvement
+* **Easy:** 15% to 60%
+* **Medium:** 25% to 30%
+* **Bonus:** 60% to 85%
+
+### Mean Reward Improvement
+* **Easy:** -0.404 to 0.575
+* **Bonus:** 0.525 to 0.980
+
+*Hard mode remains challenging, reflecting the difficulty of real-world uncertain planning.*
+
+---
+
+# Training Plot
+
+![Training Results](training_results.png)
+
+*Measured improvement after GRPO training across multiple task categories.*
+
+---
+
+# Example Live Episode
+
+### Scenario
+Andheri East to Kurla Station
+
+### Conditions
+* 45 minutes left
+* Budget: INR 55
+* Light rain
+* Train disruption warning
+
+### Learned Route
+1. **Metro** to Ghatkopar
+2. **Train** to Kurla Station
+
+**Result:** Reached successfully with time remaining.
+
+---
+
+# Repository Structure
+
+```text
+server/
+  environment.py   # route simulation + transitions
+  routes.py        # FastAPI endpoints
+graders.py         # reward / scoring logic
+inference.py       # inference runner
+openenv.yaml       # OpenEnv manifest
+Blog.md            # detailed writeup
+README.md          # project overview
+
+
+How to Run Locally
+Install dependencies:
+
+Bash
 pip install -r requirements.txt
+Run the server:
 
-# Start the FastAPI server (same runtime as Docker)
-uvicorn server.app:app --host 0.0.0.0 --port 7860
+Bash
+python -m uvicorn server.routes:app --host 0.0.0.0 --port 8000
+Access Documentation:
+Navigate to http://localhost:8000/docs
 
-# Run inference (in another terminal)
-export SERVER_URL=http://localhost:7860
-export API_BASE_URL=https://api.featherless.ai/v1
-export MODEL_NAME=Qwen/Qwen2.5-7B-Instruct
-export HF_TOKEN=your-api-key-here
-# Optional alternative key variable understood by inference.py
-export OPENAI_API_KEY=your-api-key-here
-python inference.py
-```
+Why Judges May Find This Interesting
+This environment trains capabilities useful beyond commuting:
 
-## Docker
-```bash
-docker build -t mumbai-lastmile .
-docker run -p 7860:7860 \
-  -e API_BASE_URL=https://api.featherless.ai/v1 \
-  -e MODEL_NAME=Qwen/Qwen2.5-7B-Instruct \
-  -e HF_TOKEN=your-key \
-  mumbai-lastmile
-```
+Delivery optimization
 
-Container entrypoint serves FastAPI directly on port `7860` via `uvicorn server.app:app`.
+Field worker routing
 
-## Project Structure
-```
-├── data/
-│   └── routes.py          # All Mumbai transport data + task configs
-├── server/
-│   ├── app.py             # FastAPI server
-│   └── environment.py     # Core simulation engine
-├── models.py              # Pydantic typed models
-├── client.py              # Client wrapper
-├── inference.py           # Baseline agent script
-├── server/Dockerfile      
-├── openenv.yaml           
-└── README.md              
-```
+Emergency dispatch
+
+Smart mobility systems
+
+Planning under uncertainty
+
+Final Note
+We intentionally chose a real-world messy problem over a polished toy problem. Mumbai commuters solve optimization problems every day. This environment teaches AI to do the same.
