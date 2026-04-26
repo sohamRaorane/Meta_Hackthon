@@ -1,7 +1,7 @@
 ---
 title: Mumbai Last-Mile Crisis Response
 emoji: 🚆
-colorFrom: orange
+colorFrom: red
 colorTo: blue
 sdk: docker
 pinned: false
