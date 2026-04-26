@@ -13,4 +13,4 @@ COPY . .
 EXPOSE 7860
 
 # Serve Streamlit on the public Space port and keep FastAPI backend internal.
-CMD ["sh", "-c", "uvicorn server.app:app --host 0.0.0.0 --port 8000 & streamlit run app_demo.py --server.address 0.0.0.0 --server.port 7860 --server.headless true"]
+CMD ["sh", "-c", "uvicorn server.app:app --host 0.0.0.0 --port 8000 & streamlit run app.py --server.address 0.0.0.0 --server.port 7860 --server.headless true"]
