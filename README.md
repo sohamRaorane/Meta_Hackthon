@@ -199,3 +199,31 @@ openenv.yaml
 README.md
 Blog.md
 training_results.png
+```
+
+# How to Run Locally
+
+## Install Dependencies
+
+```bash id="v9c7ta"
+pip install -r requirements.txt
+Start Server
+python -m uvicorn server.routes:app --host 0.0.0.0 --port 8000
+Open Docs
+http://localhost:8000/docs
+Why Judges May Find This Interesting
+
+This environment can train capabilities useful beyond commuting:
+
+Delivery optimization
+Field worker routing
+Emergency dispatch
+Smart mobility systems
+Planning under uncertainty
+Final Note
+
+We intentionally chose a real-world messy problem over a polished toy benchmark.
+
+Mumbai commuters solve optimization problems every day.
+
+This environment teaches AI to do the same.
