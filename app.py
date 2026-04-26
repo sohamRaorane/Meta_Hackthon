@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import json
 import time
-import random
+from pathlib import Path
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -362,55 +362,66 @@ def call_agent_api(source, destination, time_limit, cost, task_difficulty):
         resp.raise_for_status()
         return resp.json()
     except requests.exceptions.ConnectionError:
-        # ── Demo fallback when API is not running ──────────────────────────
-        MODES = ["metro", "train", "auto", "bus", "walk"]
-        WEATHERS = ["no_rain", "light_rain", "heavy_rain"]
-        weather = random.choice(WEATHERS)
-
-        # Simple rule-based mock matching the agent logic
-        if weather == "heavy_rain":
-            mode = "metro"
-            reason = "Heavy rain detected — metro is mandatory first choice."
-        elif cost < 20:
-            mode = "train"
-            reason = "Budget under ₹20 — train is the cost-optimal choice."
-        elif time_limit < 25:
-            mode = "metro"
-            reason = "Time critical (<25 min) — metro only."
-        else:
-            mode = random.choice(["metro", "train"])
-            reason = f"Optimal mode for {source} → {destination} under normal conditions."
-
-        reward  = round(random.uniform(0.4, 1.5), 4)
-        success = reward > 0.6
-
         return {
-            "mode":       mode,
-            "reason":     reason,
-            "reward":     reward,
-            "success":    success,
-            "weather":    weather,
-            "steps":      random.randint(2, 5),
-            "budget_remaining": round(cost - random.uniform(5, min(cost-1, 40)), 1),
-            "time_remaining":   round(time_limit - random.uniform(5, min(time_limit-1, 35)), 1),
-            "demo_mode":  True,
+            "error": "Backend API not reachable. Start FastAPI on port 8000 or update Backend API URL in settings."
+        }
+    except requests.exceptions.HTTPError as e:
+        return {
+            "error": f"Backend API request failed: {e}"
         }
     except Exception as e:
         return {"error": str(e)}
 
-# ── Pre/Post training results (from notebook output) ─────────────────────────
-PRE_RESULTS = {
-    "easy":   {"mean_reward": 0.42, "success_rate": 0.35},
-    "medium": {"mean_reward": 0.28, "success_rate": 0.20},
-    "hard":   {"mean_reward": -0.15, "success_rate": 0.05},
-    "bonus":  {"mean_reward": 0.10, "success_rate": 0.10},
-}
-POST_RESULTS = {
-    "easy":   {"mean_reward": 1.21, "success_rate": 0.85},
-    "medium": {"mean_reward": 0.89, "success_rate": 0.70},
-    "hard":   {"mean_reward": 0.54, "success_rate": 0.45},
-    "bonus":  {"mean_reward": 0.72, "success_rate": 0.60},
-}
+TASK_ORDER = ["easy", "medium", "hard", "bonus"]
+
+
+@st.cache_data(show_spinner=False)
+def load_training_results():
+    """Load baseline and post-training metrics from project log files."""
+    results_dir = Path(__file__).resolve().parent / "results"
+    baseline_path = results_dir / "baseline_results.json"
+    post_path = results_dir / "post_training_results.json"
+
+    errors = []
+    pre_results = {}
+    post_results = {}
+
+    try:
+        with baseline_path.open("r", encoding="utf-8") as f:
+            baseline_data = json.load(f)
+        for row in baseline_data.get("tasks", []):
+            task = str(row.get("task_name", "")).lower()
+            if task:
+                pre_results[task] = {
+                    "mean_reward": float(row.get("mean_total_reward", 0.0)),
+                    "success_rate": float(row.get("success_rate", 0.0)),
+                }
+    except Exception as e:
+        errors.append(f"Failed loading baseline logs: {e}")
+
+    try:
+        with post_path.open("r", encoding="utf-8") as f:
+            post_data = json.load(f)
+        for row in post_data.get("tasks", []):
+            task = str(row.get("task_name", "")).lower()
+            if not task:
+                continue
+
+            reward_val = row.get("mean_total_reward", row.get("total_reward", 0.0))
+            success_val = row.get("success_rate", row.get("success", 0.0))
+            if isinstance(success_val, bool):
+                success_rate = 1.0 if success_val else 0.0
+            else:
+                success_rate = float(success_val)
+
+            post_results[task] = {
+                "mean_reward": float(reward_val),
+                "success_rate": success_rate,
+            }
+    except Exception as e:
+        errors.append(f"Failed loading post-training logs: {e}")
+
+    return pre_results, post_results, errors
 
 MODE_ICONS = {
     "metro": "🚇", "train": "🚆", "auto": "🛺",
@@ -542,13 +553,9 @@ with left_col:
         steps   = res.get("steps", 1)
         budget_rem = res.get("budget_remaining", "—")
         time_rem   = res.get("time_remaining", "—")
-        demo    = res.get("demo_mode", False)
-
         w_icon   = WEATHER_ICONS.get(weather, "☀️")
         m_icon   = MODE_ICONS.get(mode, "🚇")
         chip_cls = f"chip-{mode}"
-
-        demo_note = '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:0.65rem;color:#f97316;margin-left:0.5rem">[DEMO — connect API for live inference]</span>' if demo else ""
 
         st.markdown(f"""
         <div style="margin-bottom:1rem">
@@ -589,39 +596,64 @@ with left_col:
         with c_f:
             st.markdown(f'<div class="result-label">Time Remaining</div><div class="result-val val-blue">{time_rem} min</div>', unsafe_allow_html=True)
 
-        if demo:
-            st.markdown(f"<div style='margin-top:1rem;padding:0.5rem 0.75rem;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.2);border-radius:6px;font-family:\"IBM Plex Mono\",monospace;font-size:0.68rem;color:#f97316'>⚡ Demo mode — backend not reachable. Configure API URL above to connect live inference.</div>", unsafe_allow_html=True)
-
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ── RIGHT COLUMN ──────────────────────────────────────────────────────────────
 with right_col:
+    pre_results, post_results, log_load_errors = load_training_results()
 
     # ── Pre / Post Training Results ──────────────────────────────────────────
     st.markdown('<div class="section-label">Training Results</div>', unsafe_allow_html=True)
-    st.markdown('<div class="stats-grid">', unsafe_allow_html=True)
+    selected_task = task_difficulty.lower()
+    has_training_data = selected_task in pre_results and selected_task in post_results
 
-    # Pre-training card
-    pre_html = '<div class="stat-card stat-card-pre"><div class="stat-card-title">Pre-Training (Baseline)</div>'
-    for task, d in PRE_RESULTS.items():
-        sr_pct = f"{d['success_rate']*100:.0f}%"
-        rw     = f"{d['mean_reward']:+.2f}"
-        r_col  = "#22c55e" if d['mean_reward'] > 0 else "#ef4444"
-        pre_html += f'<div class="stat-row"><span class="stat-task">{task}</span><span class="stat-val" style="color:{r_col}">{rw}</span><span class="stat-val" style="color:#64748b">{sr_pct}</span></div>'
-    pre_html += '<div style="margin-top:0.6rem;font-family:\\\'IBM Plex Mono\\\',monospace;font-size:0.62rem;color:#64748b">reward · success rate</div></div>'
+    if st.session_state.result is None:
+        st.markdown("""
+        <div style="height: 180px; display: flex; align-items: center; justify-content: center;
+                    border: 1px dashed var(--border); border-radius: 12px; color: var(--muted);
+                    font-family: var(--font-mono); font-size: 0.8rem; margin-top: 0.2rem; flex-direction: column; gap: 0.5rem;">
+            <span style="font-size:1.4rem">🧾</span>
+            <span>Run Agent to load training logs for the selected task.</span>
+        </div>
+        """, unsafe_allow_html=True)
+    elif not has_training_data:
+        st.warning(f"No training log data found for selected task: {selected_task}")
+    else:
+        st.markdown('<div class="stats-grid">', unsafe_allow_html=True)
 
-    # Post-training card
-    post_html = '<div class="stat-card stat-card-post"><div class="stat-card-title">Post-Training (3-Phase GRPO)</div>'
-    for task, d in POST_RESULTS.items():
-        sr_pct = f"{d['success_rate']*100:.0f}%"
-        rw     = f"{d['mean_reward']:+.2f}"
-        delta  = d['mean_reward'] - PRE_RESULTS[task]['mean_reward']
-        d_col  = "#22c55e" if delta > 0 else "#ef4444"
-        post_html += f'<div class="stat-row"><span class="stat-task">{task}</span><span class="stat-val" style="color:#22c55e">{rw}</span><span class="stat-val" style="color:{d_col};font-size:0.65rem">({delta:+.2f})</span><span class="stat-val" style="color:#64748b">{sr_pct}</span></div>'
-    post_html += '<div style="margin-top:0.6rem;font-family:\\\'IBM Plex Mono\\\',monospace;font-size:0.62rem;color:#64748b">reward · Δ · success rate</div></div>'
+        pre_row = pre_results[selected_task]
+        post_row = post_results[selected_task]
+        delta_reward = post_row["mean_reward"] - pre_row["mean_reward"]
 
-    st.markdown(pre_html + post_html, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+        pre_sr_pct = f"{pre_row['success_rate'] * 100:.0f}%"
+        pre_rw = f"{pre_row['mean_reward']:+.2f}"
+        pre_col = "#22c55e" if pre_row["mean_reward"] > 0 else "#ef4444"
+        pre_html = (
+            '<div class="stat-card stat-card-pre"><div class="stat-card-title">'
+            f'Pre-Training (Baseline) · {selected_task.upper()}</div>'
+            f'<div class="stat-row"><span class="stat-task">reward</span><span class="stat-val" style="color:{pre_col}">{pre_rw}</span></div>'
+            f'<div class="stat-row"><span class="stat-task">success rate</span><span class="stat-val" style="color:#64748b">{pre_sr_pct}</span></div>'
+            '<div style="margin-top:0.6rem;font-family:\'IBM Plex Mono\',monospace;font-size:0.62rem;color:#64748b">source: results/baseline_results.json</div></div>'
+        )
+
+        post_sr_pct = f"{post_row['success_rate'] * 100:.0f}%"
+        post_rw = f"{post_row['mean_reward']:+.2f}"
+        delta_col = "#22c55e" if delta_reward > 0 else "#ef4444"
+        post_html = (
+            '<div class="stat-card stat-card-post"><div class="stat-card-title">'
+            f'Post-Training · {selected_task.upper()}</div>'
+            f'<div class="stat-row"><span class="stat-task">reward</span><span class="stat-val" style="color:#22c55e">{post_rw}</span></div>'
+            f'<div class="stat-row"><span class="stat-task">delta</span><span class="stat-val" style="color:{delta_col}">{delta_reward:+.2f}</span></div>'
+            f'<div class="stat-row"><span class="stat-task">success rate</span><span class="stat-val" style="color:#64748b">{post_sr_pct}</span></div>'
+            '<div style="margin-top:0.6rem;font-family:\'IBM Plex Mono\',monospace;font-size:0.62rem;color:#64748b">source: results/post_training_results.json</div></div>'
+        )
+
+        st.markdown(pre_html + post_html, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    if log_load_errors:
+        for msg in log_load_errors:
+            st.warning(msg)
 
     # ── Visualisations (Plotly Grouped Bar Charts) ─────────────────────────────
     st.markdown('<div class="section-label" style="margin-top:0.5rem">Performance Visualisation</div>', unsafe_allow_html=True)
@@ -636,60 +668,63 @@ with right_col:
         </div>
         """, unsafe_allow_html=True)
     else:
-        tasks_list = list(PRE_RESULTS.keys())
-        pre_rewards  = [PRE_RESULTS[t]["mean_reward"]  for t in tasks_list]
-        post_rewards = [POST_RESULTS[t]["mean_reward"] for t in tasks_list]
-        pre_succ     = [PRE_RESULTS[t]["success_rate"] * 100 for t in tasks_list]
-        post_succ    = [POST_RESULTS[t]["success_rate"] * 100 for t in tasks_list]
+        tasks_list = [t for t in TASK_ORDER if t in pre_results and t in post_results]
+        pre_rewards = [pre_results[t]["mean_reward"] for t in tasks_list]
+        post_rewards = [post_results[t]["mean_reward"] for t in tasks_list]
+        pre_succ = [pre_results[t]["success_rate"] * 100 for t in tasks_list]
+        post_succ = [post_results[t]["success_rate"] * 100 for t in tasks_list]
 
-        import plotly.graph_objects as go
+        if not tasks_list:
+            st.warning("Training log files are missing task metrics for charting.")
+        else:
+            import plotly.graph_objects as go
 
-        def create_grouped_bar(y_pre, y_post, is_pct=False):
-            fig = go.Figure()
-            
-            # Colors matching the reference image: easy, medium, hard, bonus
-            colors_pre  = ["#93c5fd", "#fcd34d", "#fca5a5", "#c4b5fd"]
-            colors_post = ["#1d4ed8", "#ea580c", "#b91c1c", "#5b21b6"]
-            
-            text_pre = [f"{v:.0f}%" if is_pct else f"{v:.2f}" for v in y_pre]
-            text_post= [f"{v:.0f}%" if is_pct else f"{v:.2f}" for v in y_post]
-
-            fig.add_trace(go.Bar(
-                name='Pre-Training', x=tasks_list, y=y_pre,
-                marker_color=colors_pre, text=text_pre, textposition='outside', textfont=dict(size=10)
-            ))
-            fig.add_trace(go.Bar(
-                name='Post-Training', x=tasks_list, y=y_post,
-                marker_color=colors_post, text=text_post, textposition='outside', textfont=dict(size=10)
-            ))
-            
-            is_light = st.session_state.theme == "light"
-            text_col = "#64748b" if is_light else "#94a3b8"
-            grid_col = "#e2e8f0" if is_light else "#1e293b"
-            
-            fig.update_layout(
-                barmode='group', height=280, margin=dict(l=0, r=0, t=30, b=0),
-                plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
-                legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1, font=dict(size=11, color=text_col)),
-                xaxis=dict(showgrid=False, tickfont=dict(color=text_col, size=12, family="Plus Jakarta Sans")),
-                yaxis=dict(showgrid=True, gridcolor=grid_col, tickfont=dict(color=text_col, size=11, family="JetBrains Mono"), zerolinecolor=grid_col),
-                bargap=0.25, bargroupgap=0.05
-            )
-            # Ensure y-axis scales accommodate outside text
-            if not is_pct:
-                fig.update_yaxes(range=[min(min(y_pre), min(y_post)) - 0.2, max(max(y_pre), max(y_post)) + 0.3])
-            else:
-                fig.update_yaxes(range=[0, 110])
+            def create_grouped_bar(y_pre, y_post, is_pct=False):
+                fig = go.Figure()
                 
-            return fig
+                # Colors matching the reference image: easy, medium, hard, bonus
+                colors_pre  = ["#93c5fd", "#fcd34d", "#fca5a5", "#c4b5fd"]
+                colors_post = ["#1d4ed8", "#ea580c", "#b91c1c", "#5b21b6"]
+                
+                text_pre = [f"{v:.0f}%" if is_pct else f"{v:.2f}" for v in y_pre]
+                text_post= [f"{v:.0f}%" if is_pct else f"{v:.2f}" for v in y_post]
 
-        tab1, tab2 = st.tabs(["📊 Mean Reward", "✅ Success Rate"])
+                fig.add_trace(go.Bar(
+                    name='Pre-Training', x=tasks_list, y=y_pre,
+                    marker_color=colors_pre, text=text_pre, textposition='outside', textfont=dict(size=10)
+                ))
+                fig.add_trace(go.Bar(
+                    name='Post-Training', x=tasks_list, y=y_post,
+                    marker_color=colors_post, text=text_post, textposition='outside', textfont=dict(size=10)
+                ))
+                
+                is_light = st.session_state.theme == "light"
+                text_col = "#64748b" if is_light else "#94a3b8"
+                grid_col = "#e2e8f0" if is_light else "#1e293b"
+                
+                fig.update_layout(
+                    barmode='group', height=280, margin=dict(l=0, r=0, t=30, b=0),
+                    plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)',
+                    legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1, font=dict(size=11, color=text_col)),
+                    xaxis=dict(showgrid=False, tickfont=dict(color=text_col, size=12, family="Plus Jakarta Sans")),
+                    yaxis=dict(showgrid=True, gridcolor=grid_col, tickfont=dict(color=text_col, size=11, family="JetBrains Mono"), zerolinecolor=grid_col),
+                    bargap=0.25, bargroupgap=0.05
+                )
+                # Ensure y-axis scales accommodate outside text
+                if not is_pct:
+                    fig.update_yaxes(range=[min(min(y_pre), min(y_post)) - 0.2, max(max(y_pre), max(y_post)) + 0.3])
+                else:
+                    fig.update_yaxes(range=[0, 110])
+                    
+                return fig
 
-        with tab1:
-            st.plotly_chart(create_grouped_bar(pre_rewards, post_rewards, False), use_container_width=True, config={'displayModeBar': False})
+            tab1, tab2 = st.tabs(["📊 Mean Reward", "✅ Success Rate"])
 
-        with tab2:
-            st.plotly_chart(create_grouped_bar(pre_succ, post_succ, True), use_container_width=True, config={'displayModeBar': False})
+            with tab1:
+                st.plotly_chart(create_grouped_bar(pre_rewards, post_rewards, False), use_container_width=True, config={'displayModeBar': False})
+
+            with tab2:
+                st.plotly_chart(create_grouped_bar(pre_succ, post_succ, True), use_container_width=True, config={'displayModeBar': False})
 
     # ── Transport Mode Reference ──────────────────────────────────────────────
     st.markdown('<div class="section-label" style="margin-top:1rem">Mode Priority Reference</div>', unsafe_allow_html=True)

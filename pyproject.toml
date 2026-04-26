@@ -11,6 +11,7 @@ dependencies = [
   "requests",
   "streamlit",
   "openai",
+  "plotly",
 ]
 
 [project.scripts]
