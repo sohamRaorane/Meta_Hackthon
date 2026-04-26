@@ -328,7 +328,7 @@ class MumbaiLastMileEnvironment(Environment):
         cfg        = self._task_cfg
         leg        = self._current_leg_data()
         total_legs = len(self._legs)
-        leg_num    = self._current_leg + 1  # 1-indexed for readability
+        leg_num    = min(self._current_leg + 1, total_legs)  # display clamp only
 
         lines = []
         for m in modes:
