@@ -17,10 +17,9 @@ from server.environment import MumbaiLastMileEnvironment
 from models import MumbaiAction
 from data.routes import TASKS, CORRIDORS
 
-app = FastAPI()
 @app.get("/")
 def root():
-    return RedirectResponse(url="/docs")
+    return {"status": "ok", "message": "Mumbai LastMile API - use /reset and /step endpoints"}
 
 
 def apply_corridor_patch() -> None:
