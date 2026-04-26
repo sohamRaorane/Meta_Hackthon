@@ -15,11 +15,55 @@ import uvicorn
 
 from server.environment import MumbaiLastMileEnvironment
 from models import MumbaiAction
+from data.routes import TASKS, CORRIDORS
 
 app = FastAPI()
 @app.get("/")
 def root():
     return RedirectResponse(url="/docs")
+
+
+def apply_corridor_patch() -> None:
+    """
+    Runtime patch for hard-task leg mapping.
+
+    The second hard-task leg is Dadar -> CST and should not use the
+    CST_to_Kurla corridor. We patch this at server startup while keeping
+    source-of-truth files untouched.
+    """
+    hard_task = TASKS.get("hard")
+    if not hard_task:
+        return
+
+    legs = hard_task.get("legs", [])
+    if len(legs) < 2:
+        return
+
+    leg2 = legs[1]
+    is_target_leg = (
+        leg2.get("from_location") == "Dadar"
+        and leg2.get("to_location") == "CST"
+    )
+
+    if not is_target_leg:
+        return
+
+    if "Dadar_to_CST" not in CORRIDORS:
+        # Corridor tuned to represent a short southbound city segment.
+        CORRIDORS["Dadar_to_CST"] = {
+            "train": {"cost": 10, "time_min": 15, "time_max": 20, "availability": 0.85},
+            "bus": {"cost": 10, "time_min": 16, "time_max": 22, "availability": 0.80},
+            "auto": {"cost": 90, "time_min": 18, "time_max": 28, "availability": 0.65},
+            "metro": {"cost": 30, "time_min": 14, "time_max": 20, "availability": 0.88},
+            "walk": {"cost": 0, "time_min": 85, "time_max": 105, "availability": 1.0},
+        }
+
+    # Replace the incorrect CST_to_Kurla mapping for Dadar -> CST.
+    if leg2.get("corridor_key") == "CST_to_Kurla":
+        leg2["corridor_key"] = "Dadar_to_CST"
+
+
+apply_corridor_patch()
 
 
 def task_catalog():
