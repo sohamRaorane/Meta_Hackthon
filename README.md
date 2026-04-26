@@ -1,199 +1,181 @@
-```markdown
-# Mumbai Last-Mile Crisis Response
-### OpenEnv Hackathon Submission | Reinforcement Learning Environment for Real-World Urban Routing
+Mumbai Last-Mile Crisis Response
+OpenEnv Hackathon Submission | Reinforcement Learning Environment for Real-World Urban Routing
 
 Mumbai’s daily commute is one of the most complex transport systems in the world. A route that works at 8:30 AM can fail at 8:45 AM because of rain, signal failure, traffic congestion, crowding, or local disruptions.
 
-We built an **OpenEnv-compatible reinforcement learning environment** where an AI agent learns how to make better travel decisions under these changing conditions. Instead of solving toy games, the agent must solve a real planning problem: **Reach the destination on time, within budget, despite disruptions.**
+We built an OpenEnv-compatible reinforcement learning environment where an AI agent learns how to make better travel decisions under changing conditions.
 
----
+Instead of solving toy games, the agent must solve a real planning problem:
 
-# Live Links
+Reach the destination on time, within budget, despite disruptions.
 
-| Resource | URL |
-| :--- | :--- |
-| **Hugging Face Space** | https://huggingface.co/spaces/eagle25/mumbai-lastmile-env |
-| **Live API** | https://eagle25-mumbai-lastmile-env.hf.space |
-| **API Docs** | https://eagle25-mumbai-lastmile-env.hf.space/docs |
-| **Full Writeup** | See `Blog.md` |
+Live Links
+Resource	URL
+Hugging Face Space	https://huggingface.co/spaces/eagle25/mumbai-lastmile-env
 
----
+Live API	https://eagle25-mumbai-lastmile-env.hf.space
 
-# Why This Environment Matters
+API Docs	https://eagle25-mumbai-lastmile-env.hf.space/docs
 
-Many language models can answer questions, but struggle with:
+Full Writeup	See Blog.md
+Why This Environment Matters
 
-* **Multi-step planning**
-* **Dynamic decision making**
-* **Adapting to uncertainty**
-* **Balancing cost vs speed**
-* **Recovering from bad early choices**
+Many language models can answer questions, but still struggle with:
 
-Mumbai commuting naturally contains all of these challenges, making it a strong real-world RL benchmark.
+Multi-step planning
+Dynamic decision making
+Adapting to uncertainty
+Balancing cost vs speed
+Recovering from poor early choices
 
----
+Mumbai commuting naturally contains all of these challenges.
 
-# Environment Design
+That makes it a strong real-world reinforcement learning benchmark.
 
-The agent is given scenarios such as:
-* Andheri East to Kurla Station
-* Multi-leg transfer journeys
-* Tight budget trips
-* Time-critical office commutes
-* Weather-disrupted routes
+Environment Design
 
-### Observations
-At each step, the agent observes:
-* Current location and destination
-* Time and budget remaining
-* Weather and known disruptions
-* Available transport modes (with estimated times/costs)
+The agent receives scenarios such as:
 
-### Action Space
+Andheri East → Kurla Station
+Multi-leg transfer journeys
+Tight budget trips
+Time-critical office commutes
+Weather-disrupted routes
+Observation Space
+
+At every step, the agent sees:
+
+Current location
+Destination
+Time remaining
+Budget remaining
+Weather
+Known disruptions
+Available transport modes
+Estimated travel time
+Estimated travel cost
+Action Space
+
 The agent chooses one action:
-* **Train**
-* **Metro**
-* **Bus**
-* **Auto**
-* **Walk**
 
----
-
-# Core Logic
+Train
+Metro
+Bus
+Auto
+Walk
+Core Logic
 
 The environment simulates real trade-offs:
-* **Metro:** Fast but may cost more.
-* **Bus:** Cheap but slower.
-* **Auto:** May become unreliable in rain.
-* **Walking:** Saves money but costs time.
-* **Cascading Effects:** A bad first leg can ruin the full journey.
+
+Metro: Faster, but may cost more
+Bus: Cheaper, but slower
+Auto: Flexible, but unreliable in rain
+Walk: Free, but time expensive
+Bad first move: Can ruin later legs of the trip
 
 This creates meaningful sequential planning instead of one-step guessing.
 
----
-
-# Reward Design
+Reward Design
 
 The reward system is shaped to teach useful behavior.
 
-| Positive Reward For | Negative Reward For |
-| :--- | :--- |
-| Reaching destination | Wasting time |
-| Saving time | Overspending |
-| Staying within budget | Poor choices during disruptions |
-| Making progress each step | Failing to complete trip |
+Positive Reward For
+Reaching destination
+Saving time
+Staying within budget
+Choosing reliable transport
+Making route progress
+Negative Reward For
+Wasting time
+Overspending
+Poor disruption choices
+Failing to complete trip
 
----
+This gives richer learning signals than simple win/loss rewards.
 
-# OpenEnv Compatibility
+OpenEnv Compatibility
 
-This project follows OpenEnv style APIs:
-* `reset()`
-* `step()`
-* Environment state transitions
-* Task-based episodes
-* Hosted public environment
+This project follows OpenEnv-style APIs:
 
----
+reset()
+step()
+Episodic tasks
+State transitions
+Public hosted environment
+Training Pipeline
 
-# Training Pipeline
+We trained the agent using a GRPO-based RL pipeline with lightweight models for fast iteration.
 
-We trained the agent using a **GRPO-based RL pipeline** with lightweight models for rapid iteration.
+Training Phases
+Easy scenarios
+Medium scenarios
+Hard disruption-heavy scenarios
 
-1. **Phase 1:** Easy scenarios
-2. **Phase 2:** Medium scenarios
-3. **Phase 3:** Hard disruption-heavy scenarios
+The model repeatedly interacts with the environment, receives rewards, and improves decisions over time.
 
-The model repeatedly interacts with the environment, receives reward feedback, and improves behavior over time.
+Results
+Success Rate Improvement
+Easy: 15% → 60%
+Medium: 25% → 30%
+Bonus: 60% → 85%
+Mean Reward Improvement
+Easy: -0.404 → 0.575
+Bonus: 0.525 → 0.980
 
----
+Hard mode remains challenging, which reflects realistic planning difficulty.
 
-# Results
+Training Plot
 
-### Success Rate Improvement
-* **Easy:** 15% to 60%
-* **Medium:** 25% to 30%
-* **Bonus:** 60% to 85%
+Measured improvement after GRPO training across multiple task categories.
 
-### Mean Reward Improvement
-* **Easy:** -0.404 to 0.575
-* **Bonus:** 0.525 to 0.980
+Example Live Episode
+Scenario
 
-*Hard mode remains challenging, reflecting the difficulty of real-world uncertain planning.*
+Andheri East → Kurla Station
 
----
+Conditions
+45 minutes remaining
+₹55 budget
+Light rain
+Train disruption warning
+Learned Route
+Metro to Ghatkopar
+Train to Kurla Station
+Result
 
-# Training Plot
+Reached destination successfully with time remaining.
 
-![Training Results](training_results.png)
-
-*Measured improvement after GRPO training across multiple task categories.*
-
----
-
-# Example Live Episode
-
-### Scenario
-Andheri East to Kurla Station
-
-### Conditions
-* 45 minutes left
-* Budget: INR 55
-* Light rain
-* Train disruption warning
-
-### Learned Route
-1. **Metro** to Ghatkopar
-2. **Train** to Kurla Station
-
-**Result:** Reached successfully with time remaining.
-
----
-
-# Repository Structure
-
-```text
+Repository Structure
 server/
   environment.py   # route simulation + transitions
   routes.py        # FastAPI endpoints
+
 graders.py         # reward / scoring logic
 inference.py       # inference runner
 openenv.yaml       # OpenEnv manifest
-Blog.md            # detailed writeup
 README.md          # project overview
-```
-
----
-
-# How to Run Locally
-
-1. **Install dependencies:**
-```bash
+Blog.md            # detailed writeup
+training_results.png
+How to Run Locally
+Install Dependencies
 pip install -r requirements.txt
-```
-
-2. **Run the server:**
-```bash
+Start Server
 python -m uvicorn server.routes:app --host 0.0.0.0 --port 8000
-```
+Open Docs
+http://localhost:8000/docs
+Why Judges May Find This Interesting
 
-3. **Access Documentation:**
-Navigate to `http://localhost:8000/docs`
+This environment can train capabilities useful beyond commuting:
 
----
+Delivery optimization
+Field worker routing
+Emergency dispatch
+Smart mobility systems
+Planning under uncertainty
+Final Note
 
-# Why Judges May Find This Interesting
+We intentionally chose a real-world messy problem over a polished toy benchmark.
 
-This environment trains capabilities useful beyond commuting:
-* **Delivery optimization**
-* **Field worker routing**
-* **Emergency dispatch**
-* **Smart mobility systems**
-* **Planning under uncertainty**
+Mumbai commuters solve optimization problems every day.
 
----
-
-# Final Note
-
-We intentionally chose a real-world messy problem over a polished toy problem. Mumbai commuters solve optimization problems every day. This environment teaches AI to do the same.
-```
+This environment teaches AI to do the same.
