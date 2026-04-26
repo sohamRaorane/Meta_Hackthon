@@ -1,3 +1,4 @@
+```markdown
 # Mumbai Last-Mile Crisis Response
 ### OpenEnv Hackathon Submission | Reinforcement Learning Environment for Real-World Urban Routing
 
@@ -160,32 +161,39 @@ inference.py       # inference runner
 openenv.yaml       # OpenEnv manifest
 Blog.md            # detailed writeup
 README.md          # project overview
+```
 
+---
 
-How to Run Locally
-Install dependencies:
+# How to Run Locally
 
-Bash
+1. **Install dependencies:**
+```bash
 pip install -r requirements.txt
-Run the server:
+```
 
-Bash
+2. **Run the server:**
+```bash
 python -m uvicorn server.routes:app --host 0.0.0.0 --port 8000
-Access Documentation:
-Navigate to http://localhost:8000/docs
+```
 
-Why Judges May Find This Interesting
+3. **Access Documentation:**
+Navigate to `http://localhost:8000/docs`
+
+---
+
+# Why Judges May Find This Interesting
+
 This environment trains capabilities useful beyond commuting:
+* **Delivery optimization**
+* **Field worker routing**
+* **Emergency dispatch**
+* **Smart mobility systems**
+* **Planning under uncertainty**
 
-Delivery optimization
+---
 
-Field worker routing
+# Final Note
 
-Emergency dispatch
-
-Smart mobility systems
-
-Planning under uncertainty
-
-Final Note
 We intentionally chose a real-world messy problem over a polished toy problem. Mumbai commuters solve optimization problems every day. This environment teaches AI to do the same.
+```
