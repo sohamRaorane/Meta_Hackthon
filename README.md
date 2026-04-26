@@ -18,7 +18,8 @@ Instead of solving toy games, the agent must solve a real planning problem:
 | Hugging Face Space | https://huggingface.co/spaces/eagle25/mumbai-lastmile-env |
 | Live API | https://eagle25-mumbai-lastmile-env.hf.space |
 | API Docs | https://eagle25-mumbai-lastmile-env.hf.space/docs |
-| Full Writeup | See `Blog.md` |
+| Blog / Writeup | https://github.com/sohamRaorane/Meta_Hackthon/blob/main/Blog.md |
+| Training Plots | See results/ folder |
 
 ---
 
